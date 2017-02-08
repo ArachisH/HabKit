@@ -17,6 +17,11 @@ Some black box should have appeared, the next step involves changing the current
 ```
 cd C:\Users\{Username}\Desktop\HabBit
 ```
+The next step is passing the path of the client to the executable, we can do this by simply dragging & dropping the file onto the command prompt after **HabBit.exe**.
+```
+HabBit.exe {Client Path}.swf [/dhost] [/clean] [/blah blah]
+```
+
 Congratulations, you can do stuff, we can now run the executable by entering **HabBit.exe** into the command prompt.
 
 ## Arguments
