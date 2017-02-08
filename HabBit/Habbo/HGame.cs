@@ -705,7 +705,6 @@ namespace HabBit.Habbo
                 }
 
                 ASCode code = method.Body.ParseCode();
-
                 if (code.StartsWith(OPCode.PushString, OPCode.ReturnValue))
                 {
                     code.RemoveRange(0, 2);
