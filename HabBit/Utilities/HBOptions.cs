@@ -132,21 +132,17 @@ namespace HabBit.Utilities
                     }
                     case "/rsa":
                     {
-                        if (valStack.Count > 0)
+                        if (valStack.Count >= 2)
                         {
-                            if (valStack.Count >= 2)
-                            {
-                                var Modulus = valStack.Pop();
-                                var Exponent = valStack.Pop();
-
-                                Keys = new HBRSAKeys(Modulus, Exponent);
-                            }
-                            else
-                            {
-                                int keySize = 1024;
-                                int.TryParse(valStack.Pop(), out keySize);
-                                Keys = new HBRSAKeys(keySize);
-                            }
+                            string modulus = valStack.Pop();
+                            string exponent = valStack.Pop();
+                            Keys = new HBRSAKeys(modulus, exponent);
+                        }
+                        else if (valStack.Count == 1)
+                        {
+                            int keySize = 1024;
+                            int.TryParse(valStack.Pop(), out keySize);
+                            Keys = new HBRSAKeys(keySize);
                         }
                         else Keys = new HBRSAKeys();
                         IsReplacingRSAKeys = true;
