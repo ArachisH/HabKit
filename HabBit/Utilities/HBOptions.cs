@@ -134,9 +134,19 @@ namespace HabBit.Utilities
                     {
                         if (valStack.Count > 0)
                         {
-                            int keySize = 1024;
-                            int.TryParse(valStack.Pop(), out keySize);
-                            Keys = new HBRSAKeys(keySize);
+                            if (valStack.Count >= 2)
+                            {
+                                var Modulus = valStack.Pop();
+                                var Exponent = valStack.Pop();
+
+                                Keys = new HBRSAKeys(Modulus, Exponent);
+                            }
+                            else
+                            {
+                                int keySize = 1024;
+                                int.TryParse(valStack.Pop(), out keySize);
+                                Keys = new HBRSAKeys(keySize);
+                            }
                         }
                         else Keys = new HBRSAKeys();
                         IsReplacingRSAKeys = true;
