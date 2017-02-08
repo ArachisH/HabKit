@@ -34,7 +34,7 @@ namespace HabBit.Utilities
         public bool IsDisablingHostChecks { get; set; }
 
         /// <summary>
-        /// Gets or sets a value that determines whether various message data will be dumped. (Headers, Templates, Profiles)
+        /// Gets or sets a value that determines whether to dump Outgoing/Incoming message data to a text file(Header, SHA1, Constructor Signature).
         /// </summary>
         public bool IsDumpingMessageData { get; set; }
 
@@ -44,7 +44,7 @@ namespace HabBit.Utilities
         public bool IsDisablingHandshake { get; set; }
 
         /// <summary>
-        /// Gets or sets whether to sanitize the client by deobfuscation instructions, and renaming invalid identifiers.
+        /// Gets or sets whether to sanitize the client by deobfuscating methods, and renaming invalid identifiers.
         /// </summary>
         public bool IsSanitizing { get; set; }
 
