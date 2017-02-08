@@ -100,24 +100,14 @@ namespace HabBit
             {
                 Console.Write("Replacing RSA Keys...");
                 Game.ReplaceRSAKeys(Options.Keys.Exponent, Options.Keys.Modulus).WriteLineResult();
-
-                Console.WriteLine("Saving keys on RSAKeys.txt");
-
-                using (FileStream Stream = File.Open(Path.Combine(OutputDirectoryName, "RSAKeys.txt"), FileMode.Create))
-                {
-                    using (var Output = new StreamWriter(Stream))
-                    {
-                        Output.WriteLine("Modulus(n): " + Options.Keys.Modulus);
-                        Output.WriteLine("Private Exponent(d):" + Options.Keys.PrivateExponent);
-                        Output.WriteLine("Exponent(e):" + Options.Keys.Exponent);
-                    }
-                }
             }
+
             if (Options.IsDisablingHostChecks)
             {
                 Console.Write("Disabling Host Checks...");
                 Game.DisableHostChecks().WriteLineResult();
             }
+
             if (Options.IsInjectingMessageLogger)
             {
                 Console.Write("Injecting Message Logger");
@@ -147,33 +137,49 @@ namespace HabBit
             Game.GenerateMessageProfiles();
             ConsoleEx.WriteLineFinished();
 
-            using (FileStream stream = File.Open(
-                Path.Combine(OutputDirectoryName, "Messages.txt"), FileMode.Create))
-            using (var output = new StreamWriter(stream))
-            {
-                output.WriteLine("// Outgoing Messages | {0:n0}", Game.OutMessages.Count);
-                WriteMessages(output, "Outgoing", Game.OutMessages);
-
-                output.WriteLine();
-
-                output.WriteLine("// Incoming Messages | {0:n0}", Game.OutMessages.Count);
-                WriteMessages(output, "Incoming", Game.InMessages);
-            }
-
             Console.WriteLine();
         }
         private void Assemble()
         {
             ConsoleEx.WriteLineTitle("Assembling");
 
-            var asmdFileInfo = new FileInfo(
-                Path.Combine(OutputDirectoryName, Options.ClientInfo.Name));
-
-            using (var asmdStream = File.Open(asmdFileInfo.FullName, FileMode.Create))
+            string asmdPath = Path.Combine(OutputDirectoryName, Options.ClientInfo.Name);
+            using (var asmdStream = File.Open(asmdPath, FileMode.Create))
             using (var asmdOutput = new FlashWriter(asmdStream))
             {
                 Game.Assemble(asmdOutput, (CompressionKind)Options.Compression);
-                Console.WriteLine("File Assembled: " + Path.Combine(asmdFileInfo.Directory.Name, asmdFileInfo.Name));
+                Console.WriteLine("File Assembled: " + asmdPath);
+            }
+
+            if (Options.IsReplacingRSAKeys)
+            {
+                string keysPath = Path.Combine(Path.Combine(OutputDirectoryName, "RSAKeys.txt"));
+                using (var keysStream = File.Open(keysPath, FileMode.Create))
+                using (var keysOutput = new StreamWriter(keysStream))
+                {
+                    keysOutput.WriteLine("[E]Exponent: " + Options.Keys.Exponent);
+                    keysOutput.WriteLine("[N]Modulus: " + Options.Keys.Modulus);
+                    keysOutput.Write("[D]Private Exponent: " + Options.Keys.PrivateExponent);
+                    Console.WriteLine("RSA Keys Saved: " + keysPath);
+                }
+            }
+
+            if (Options.IsDumpingMessageData)
+            {
+                string msgsPath = Path.Combine(OutputDirectoryName, "Messages.txt");
+                using (var msgsStream = File.Open(msgsPath, FileMode.Create))
+                using (var msgsOutput = new StreamWriter(msgsStream))
+                {
+                    msgsOutput.WriteLine("// Outgoing Messages | " + Game.OutMessages.Count.ToString("n0"));
+                    WriteMessages(msgsOutput, "Outgoing", Game.OutMessages);
+
+                    msgsOutput.WriteLine();
+
+                    msgsOutput.WriteLine("// Incoming Messages | " + Game.OutMessages.Count.ToString("n0"));
+                    WriteMessages(msgsOutput, "Incoming", Game.InMessages);
+                    
+                    Console.WriteLine("Messages Saved: " + msgsPath);
+                }
             }
 
             Console.WriteLine();
