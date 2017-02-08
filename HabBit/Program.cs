@@ -17,7 +17,6 @@ namespace HabBit
     public class Program
     {
         public HGame Game { get; }
-        public HBRSAKeys Keys { get; }
         public HBOptions Options { get; }
 
         public bool IsModifying
@@ -100,7 +99,19 @@ namespace HabBit
             else if (Options.IsReplacingRSAKeys)
             {
                 Console.Write("Replacing RSA Keys...");
-                Game.ReplaceRSAKeys(Keys.Exponent, Keys.Modulus).WriteLineResult();
+                Game.ReplaceRSAKeys(Options.Keys.Exponent, Options.Keys.Modulus).WriteLineResult();
+
+                Console.WriteLine("Saving keys on RSAKeys.txt");
+
+                using (FileStream Stream = File.Open(Path.Combine(OutputDirectoryName, "RSAKeys.txt"), FileMode.Create))
+                {
+                    using (var Output = new StreamWriter(Stream))
+                    {
+                        Output.WriteLine("Modulus(n): " + Options.Keys.Modulus);
+                        Output.WriteLine("Private Exponent(d):" + Options.Keys.PrivateExponent);
+                        Output.WriteLine("Exponent(e):" + Options.Keys.Exponent);
+                    }
+                }
             }
             if (Options.IsDisablingHostChecks)
             {
