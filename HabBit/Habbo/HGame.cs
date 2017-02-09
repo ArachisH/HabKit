@@ -30,6 +30,7 @@ namespace HabBit.Habbo
         public List<ABCFile> ABCFiles { get; }
         public SortedDictionary<ushort, MessageItem> InMessages { get; }
         public SortedDictionary<ushort, MessageItem> OutMessages { get; }
+        public SortedDictionary<string, List<MessageItem>> Messages { get; }
 
         private int _revisionIndex;
         public string Revision
@@ -73,6 +74,7 @@ namespace HabBit.Habbo
             ABCFiles = new List<ABCFile>();
             InMessages = new SortedDictionary<ushort, MessageItem>();
             OutMessages = new SortedDictionary<ushort, MessageItem>();
+            Messages = new SortedDictionary<string, List<MessageItem>>();
         }
 
         public void Sanitize()
@@ -328,12 +330,19 @@ namespace HabBit.Habbo
         }
         #endregion
 
-        public void GenerateMessageProfiles()
+        public void GenerateMessageHashes()
         {
             FindMessageReferences(ABCFiles[2]);
             foreach (MessageItem message in _messages.Values)
             {
-                message.GenerateProfile();
+                List<MessageItem> group = null;
+                message.SHA1 = message.GenerateSHA1();
+                if (!Messages.TryGetValue(message.SHA1, out group))
+                {
+                    group = new List<MessageItem>();
+                    Messages.Add(message.SHA1, group);
+                }
+                group.Add(message);
             }
         }
         #region Message Profiling Methods
@@ -744,7 +753,7 @@ namespace HabBit.Habbo
                 getLexInst = (instructions[i + 2] as GetLexIns);
                 ASClass messageClass = abc.GetClasses(getLexInst.TypeName.Name).First();
 
-                var message = new MessageItem(messageClass, isOutgoing, header);
+                var message = new MessageItem(header, isOutgoing, messageClass);
                 (isOutgoing ? OutMessages : InMessages).Add(header, message);
                 _messages.Add(messageClass, message);
 
@@ -946,7 +955,7 @@ namespace HabBit.Habbo
         {
             if (invalidOnSanitized &&
                 (value.StartsWith("Class_") ||
-                value.StartsWith("Interface_") ||
+                value.StartsWith("IInterface_") ||
                 value.StartsWith("Namespace_") ||
                 value.StartsWith("Method_") ||
                 value.StartsWith("Constant_") ||
@@ -964,32 +973,47 @@ namespace HabBit.Habbo
         {
             public ushort Header { get; }
             public bool IsOutgoing { get; }
+            public string SHA1 { get; set; }
 
             public ASClass Class { get; }
+            public ASClass Parser { get; }
             public List<MessageReference> References { get; }
 
-            public ASClass Parser { get; }
-            public MessageProfile Profile { get; private set; }
-
-            public MessageItem(ASClass @class, bool isOutgoing, ushort header)
+            public MessageItem()
             {
-                Class = @class;
+                References = new List<MessageReference>();
+            }
+            public MessageItem(ushort header, bool isOutgoing)
+                : this()
+            {
                 Header = header;
                 IsOutgoing = isOutgoing;
-
-                References = new List<MessageReference>();
+            }
+            public MessageItem(ushort header, bool isOutgoing, ASClass @class)
+                : this(header, isOutgoing)
+            {
+                Class = @class;
                 if (!IsOutgoing)
                 {
                     Parser = GetMessageParser(Class);
                 }
             }
 
-            public void GenerateProfile()
+            public string GenerateSHA1()
             {
-                Profile = new MessageProfile(this);
+                using (var sha1 = new SHA1Managed())
+                using (var sha1Mem = new MemoryStream())
+                using (var crypto = new CryptoStream(sha1Mem, sha1, CryptoStreamMode.Write))
+                using (var output = new BinaryWriter(crypto))
+                {
+                    Write(output);
+                    crypto.FlushFinalBlock();
+
+                    return (SHA1 = BitConverter.ToString(sha1.Hash)
+                        .Replace("-", string.Empty)
+                        .ToLower());
+                }
             }
-            public void GenerateProfile(Stream input)
-            { }
 
             private ASClass GetMessageParser(ASClass @class)
             {
@@ -1032,62 +1056,42 @@ namespace HabBit.Habbo
                 }
                 return null;
             }
-        }
-        public class MessageProfile
-        {
-            public string SHA1 { get; }
 
-            public MessageProfile(MessageItem message)
+            private void Write(BinaryWriter output)
             {
-                SHA1 = GenerateSHA1(message);
-            }
-
-            private string GenerateSHA1(MessageItem message)
-            {
-                using (var sha1 = new SHA1Managed())
-                using (var sha1Mem = new MemoryStream())
-                using (var crypto = new CryptoStream(sha1Mem, sha1, CryptoStreamMode.Write))
-                using (var output = new BinaryWriter(crypto))
+                output.Write(IsOutgoing);
+                string name = Class.Instance.QName.Name;
+                if (!IsValidIdentifier(name, true))
                 {
-                    output.Write(message.IsOutgoing);
-                    string name = message.Class.Instance.QName.Name;
-                    if (!IsValidIdentifier(name, true))
+                    WriteMethod(output, Class.Constructor);
+                    WriteMethod(output, Class.Instance.Constructor);
+
+                    WriteContainer(output, Class);
+                    WriteContainer(output, Class.Instance);
+
+                    output.Write(References.Count);
+                    foreach (MessageReference reference in References)
                     {
-                        WriteMethod(output, message.Class.Constructor);
-                        WriteMethod(output, message.Class.Instance.Constructor);
-
-                        WriteContainer(output, message.Class);
-                        WriteContainer(output, message.Class.Instance);
-
-                        output.Write(message.References.Count);
-                        foreach (MessageReference reference in message.References)
+                        if (IsOutgoing)
                         {
-                            if (message.IsOutgoing)
-                            {
-                                output.Write(reference.ReferencedAt);
-                            }
-                            else if (reference.InCallback != null)
-                            {
-                                WriteMethod(output, reference.InCallback);
-                            }
-
-                            output.Write(reference.IsAnonymous);
                             output.Write(reference.Rank);
-
-                            WriteMethod(output, reference.FromMethod);
-                            WriteContainer(output, reference.FromClass.Instance, false);
+                            output.Write(reference.ReferencedAt);
                         }
-                        if (!message.IsOutgoing)
+                        else if (reference.InCallback != null)
                         {
-                            WriteContainer(output, message.Parser.Instance);
+                            WriteMethod(output, reference.InCallback);
                         }
-                    }
-                    else output.Write(name);
+                        output.Write(reference.IsAnonymous);
 
-                    crypto.FlushFinalBlock();
-                    return BitConverter.ToString(sha1.Hash)
-                        .Replace("-", string.Empty).ToLower();
+                        WriteMethod(output, reference.FromMethod);
+                        WriteContainer(output, reference.FromClass.Instance, false);
+                    }
+                    if (!IsOutgoing)
+                    {
+                        WriteContainer(output, Parser.Instance);
+                    }
                 }
+                else output.Write(name);
             }
             private void WriteTrait(BinaryWriter output, ASTrait trait)
             {
@@ -1147,11 +1151,28 @@ namespace HabBit.Habbo
 
                 ASCode code = method.Body.ParseCode();
                 SortedDictionary<OPCode, List<ASInstruction>> groups = code.GetOPGroups();
+
+                bool isRounding = (code.Contains(OPCode.Pop) ||
+                    code.Contains(OPCode.Dup) ||
+                    code.Contains(OPCode.IfTrue) ||
+                    code.Contains(OPCode.IfFalse) ||
+                    code.Contains(OPCode.PushTrue) ||
+                    code.Contains(OPCode.PushFalse) ||
+                    code.Contains(OPCode.Convert_b));
+
+                int excess = 0;
                 foreach (KeyValuePair<OPCode, List<ASInstruction>> group in groups)
                 {
                     output.Write((byte)group.Key);
-                    output.Write(groups.Values.Count);
+                    int count = group.Value.Count;
+                    if (isRounding)
+                    {
+                        count = (((int)Math.Round(count / 10.0)) * 10);
+                        excess += Math.Abs(group.Value.Count - count);
+                    }
+                    output.Write(count);
                 }
+                output.Write(excess / 10);
             }
             private void WriteMultiname(BinaryWriter output, ASMultiname multiname)
             {
