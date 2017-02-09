@@ -33,18 +33,22 @@ namespace HabBit
         {
             get
             {
-                return (
-                    Options.IsSanitizing ||
+                return (Options.IsSanitizing ||
                     Options.IsReplacingRSAKeys ||
                     Options.IsDisablingHandshake ||
                     Options.IsDisablingHostChecks ||
-                    !string.IsNullOrWhiteSpace(Options.Revision
-                    ));
+                    Options.IsInjectingKeyShouter ||
+                    Options.IsInjectingMessageLogger ||
+                    !string.IsNullOrWhiteSpace(Options.Revision));
             }
         }
         public bool IsExtracting
         {
-            get { return Options.IsDumpingMessageData; }
+            get
+            {
+                return (Options.IsDumpingMessageData ||
+                    Options.IsMatchingMessages);
+            }
         }
 
         public Program(string[] args)
@@ -117,8 +121,6 @@ namespace HabBit
 
                             int revisionStart = (line.IndexOf("gordon/") + 7);
                             Options.RemoteRevision = line.Substring(revisionStart, (line.Length - revisionStart) - 1);
-
-                            Console.WriteLine("Latest Revision: " + Options.RemoteRevision);
                             break;
                         }
                     }
@@ -196,8 +198,42 @@ namespace HabBit
             ConsoleEx.WriteLineTitle("Extracting");
 
             Console.Write("Generating Message Profiles...");
-            Game.GenerateMessageProfiles();
+            Game.GenerateMessageHashes();
             ConsoleEx.WriteLineFinished();
+
+            if (Options.IsMatchingMessages)
+            {
+                using (var hashesStream = File.OpenRead(Options.HashesInfo.FullName))
+                using (var hashesInput = new BinaryReader(hashesStream))
+                {
+                    int messageCount = hashesInput.ReadInt32();
+                    string revision = hashesInput.ReadString();
+
+                    int duplicateMatches = 0;
+                    int unmatchedMessages = 0;
+                    Console.Write($"Matching Messages({revision})...");
+                    for (int i = 0; i < messageCount; i++)
+                    {
+                        bool isOutgoing = hashesInput.ReadBoolean();
+                        ushort header = hashesInput.ReadUInt16();
+                        string sha1 = hashesInput.ReadString();
+
+                        var message = new HGame.MessageItem(header, isOutgoing);
+                        message.SHA1 = sha1;
+
+                        List<HGame.MessageItem> messages = null;
+                        if (Game.Messages.TryGetValue(sha1, out messages))
+                        {
+                            if (messages.Count > 1)
+                            {
+                                duplicateMatches++;
+                            }
+                        }
+                        else unmatchedMessages++;
+                    }
+                    ConsoleEx.WriteLineFinished();
+                }
+            }
         }
         private void Assemble()
         {
@@ -211,6 +247,7 @@ namespace HabBit
                 Console.WriteLine("File Assembled: " + asmdPath);
             }
 
+            #region Storing RSA Keys
             if (Options.IsReplacingRSAKeys)
             {
                 string keysPath = Path.Combine(Options.OutputDirectory, "RSAKeys.txt");
@@ -223,13 +260,18 @@ namespace HabBit
                     Console.WriteLine("RSA Keys Saved: " + keysPath);
                 }
             }
+            #endregion
 
+            #region Storing Message Data
             if (Options.IsDumpingMessageData)
             {
                 string msgsPath = Path.Combine(Options.OutputDirectory, "Messages.txt");
                 using (var msgsStream = File.Open(msgsPath, FileMode.Create))
                 using (var msgsOutput = new StreamWriter(msgsStream))
                 {
+                    msgsOutput.WriteLine("// " + Game.Revision);
+                    msgsOutput.WriteLine();
+
                     msgsOutput.WriteLine("// Outgoing Messages | " + Game.OutMessages.Count.ToString("n0"));
                     WriteMessages(msgsOutput, "Outgoing", Game.OutMessages);
 
@@ -240,7 +282,33 @@ namespace HabBit
 
                     Console.WriteLine("Messages Saved: " + msgsPath);
                 }
+
+                string hashesPath = Path.Combine(Options.OutputDirectory, "Messages.hshs");
+                using (var hashesStream = File.Open(hashesPath, FileMode.Create))
+                using (var hashesOutput = new BinaryWriter(hashesStream))
+                {
+                    hashesStream.Position += 4;
+                    hashesOutput.Write(Game.Revision);
+
+                    int count = 0;
+                    foreach (KeyValuePair<ushort, HGame.MessageItem> messagePair in
+                        Game.OutMessages.Concat(Game.InMessages))
+                    {
+                        count++;
+                        ushort header = messagePair.Key;
+                        HGame.MessageItem message = messagePair.Value;
+
+                        hashesOutput.Write(message.IsOutgoing);
+                        hashesOutput.Write(header);
+                        hashesOutput.Write(message.SHA1);
+                    }
+
+                    hashesStream.Position = 0;
+                    hashesOutput.Write(count);
+                    Console.WriteLine("Message Hashes Saved: " + hashesPath);
+                }
             }
+            #endregion
         }
         private void Disassemble()
         {
@@ -267,10 +335,9 @@ namespace HabBit
             ASInstance instance = message.Class.Instance;
 
             string name = instance.QName.Name;
-            string sha1 = message.Profile.SHA1;
             string constructorSig = instance.Constructor.ToAS3(true);
 
-            output.Write($"[{message.Header}, {sha1}] = {name}{constructorSig}");
+            output.Write($"[{message.Header}, {message.SHA1}] = {name}{constructorSig}");
             if (!message.IsOutgoing)
             {
                 output.Write($"[Parser: {message.Parser.Instance.QName.Name}]");
@@ -289,7 +356,7 @@ namespace HabBit
                     continue;
                 }
 
-                string sha1 = message.Profile.SHA1;
+                string sha1 = message.SHA1;
                 SortedList<ushort, HGame.MessageItem> hashes = null;
                 if (!hashCollisions.TryGetValue(sha1, out hashes))
                 {
@@ -308,7 +375,7 @@ namespace HabBit
 
             foreach (HGame.MessageItem message in messages.Values)
             {
-                string sha1 = message.Profile.SHA1;
+                string sha1 = message.SHA1;
                 if (hashCollisions.ContainsKey(sha1)) continue;
                 if (message.References.Count == 0) continue;
 
