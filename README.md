@@ -32,7 +32,7 @@ HabBit.exe {Client Path}.swf /dhost /rsa /clean /dump
 | **Optional**   | \kshout  | Client will be forced to publicly share the DH(RC4 Stream Cypher) private key to any connected parties.        | None                                | **Optional** |
 | **Optional**   | \log     | Call an external function every time a message is being sent/received with the array of values as a parameter. | functionName                        | **Optional** |
 | **Optional**   | \rev     | Sets the client's revision value found in the Outgoing[4000] message class handler.                            | revision                            | **Required** |
-| **Optional**   | \rsa     | Override the client's internal public RSA keys with a newly generated pair, or an already existing one.                                                                | rsaKeySize **OR** modulus, exponent | **Required** |
+| **Optional**   | \rsa     | Override the client's internal public RSA keys with a newly generated pair, or an already existing one.                                                                | rsaKeySize **OR** modulus, exponent | **Optional** |
 
 ### Dependent Default Values
 | Argument       | Description                                                                                                                                                                                                                                    |
