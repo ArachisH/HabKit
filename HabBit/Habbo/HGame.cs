@@ -606,6 +606,54 @@ namespace HabBit.Habbo
             }
             return DisableHostChanges();
         }
+        public bool EnableDebugLogger(string functionName = null)
+        {
+            ABCFile abc = ABCFiles[1];
+
+            ASMethod logMethod = null;
+            foreach (ASClass @class in abc.Classes)
+            {
+                if (@class.Traits.Count != 2) continue;
+                logMethod = @class.GetMethod(0, "log", "void");
+                if (logMethod != null) break;
+            }
+            if (logMethod == null) return false;
+
+            int externalInterfaceQNameIndex = abc.Pool.GetMultinameIndices("ExternalInterface").FirstOrDefault();
+            if (externalInterfaceQNameIndex == 0) return false;
+
+            int availableQNameIndex = abc.Pool.GetMultinameIndices("available").FirstOrDefault();
+            if (availableQNameIndex == 0) return false;
+
+            int callQNameIndex = abc.Pool.GetMultinameIndices("call").FirstOrDefault();
+            if (callQNameIndex == 0) return false;
+
+            ASCode code = logMethod.Body.ParseCode();
+            int startIndex = (code.IndexOf(OPCode.PushScope) + 1);
+
+            var ifNotAvailable = new IfFalseIns() { Offset = 1 };
+            ASInstruction jumpExit = code[code.IndexOf(OPCode.ReturnVoid)];
+
+            functionName = (functionName ?? "console.log");
+            int functionNameIndex = abc.Pool.AddConstant(functionName, false);
+
+            code.InsertRange(startIndex, new ASInstruction[]
+            {
+                new GetLexIns(abc) { TypeNameIndex = externalInterfaceQNameIndex },
+                new GetPropertyIns(abc) { PropertyNameIndex = availableQNameIndex },
+                ifNotAvailable,
+                new GetLexIns(abc) { TypeNameIndex = externalInterfaceQNameIndex },
+                new PushStringIns(abc, functionNameIndex),
+                new GetLocal1Ins(),
+                new CallPropVoidIns(abc) { ArgCount = 2, PropertyNameIndex = callQNameIndex }
+            });
+
+            code.JumpExits[ifNotAvailable] = jumpExit;
+            logMethod.Body.Code = code.ToArray();
+
+            logMethod.Body.MaxStack += 3;
+            return true;
+        }
         public bool InjectMessageLogger(string functionName = null)
         {
             ASClass coreClass = ABCFiles[1].GetClasses("Core").FirstOrDefault();
