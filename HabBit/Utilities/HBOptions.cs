@@ -9,9 +9,19 @@ namespace HabBit.Utilities
     public class HBOptions
     {
         /// <summary>
+        /// Gets or sets the output directory where all the files will be saved to.
+        /// </summary>
+        public string OutputDirectory { get; set; }
+
+        /// <summary>
         /// Gets or sets a value that determines whether to download the latest client.
         /// </summary>
         public bool IsFetchingClient { get; set; }
+
+        /// <summary>
+        /// Gets or sets the remote revion of the client to fetch.
+        /// </summary>
+        public string RemoteRevision { get; set; }
 
         /// <summary>
         /// Gets or sets the file info of the file to be process.
@@ -76,80 +86,145 @@ namespace HabBit.Utilities
         public HBOptions(string[] args)
         {
             ClientInfo = new FileInfo(args[0]);
-            var valStack = new Stack<string>();
-            var argStack = new Stack<string>(args);
-            while (argStack.Count > 0)
+            if (!ClientInfo.Exists)
             {
-                string argName = argStack.Pop();
-                switch (argName)
+                ClientInfo = null;
+            }
+
+            var valus = new Stack<string>();
+            var arguments = new Stack<string>(args);
+            while (arguments.Count > 0)
+            {
+                string argument = arguments.Pop();
+                if (!ParseArgument(argument, valus))
                 {
-                    default:
-                    valStack.Push(argName);
-                    break;
-
-                    case "/dcrypto":
-                    IsDisablingHandshake = true;
-                    break;
-
-                    case "/clean":
-                    IsSanitizing = true;
-                    break;
-
-                    case "/dump":
-                    IsDumpingMessageData = true;
-                    break;
-
-                    case "/log":
-                    IsInjectingMessageLogger = true;
-                    if (valStack.Count > 0)
-                    {
-                        LoggerFunctionName = valStack.Pop();
-                    }
-                    break;
-
-                    case "/kshout":
-                    IsInjectingKeyShouter = true;
-                    break;
-
-                    case "/dhost":
-                    IsDisablingHostChecks = true;
-                    break;
-
-                    case "/c":
-                    {
-                        var compression = CompressionKind.None;
-                        if (valStack.Count > 0 &&
-                            Enum.TryParse(valStack.Pop(), true, out compression))
-                        {
-                            Compression = compression;
-                        }
-                        break;
-                    }
-                    case "/rev":
-                    {
-                        Revision = valStack.Pop();
-                        break;
-                    }
-                    case "/rsa":
-                    {
-                        if (valStack.Count >= 2)
-                        {
-                            string modulus = valStack.Pop();
-                            string exponent = valStack.Pop();
-                            Keys = new HBRSAKeys(modulus, exponent);
-                        }
-                        else if (valStack.Count == 1)
-                        {
-                            int keySize = 1024;
-                            int.TryParse(valStack.Pop(), out keySize);
-                            Keys = new HBRSAKeys(keySize);
-                        }
-                        else Keys = new HBRSAKeys();
-                        IsReplacingRSAKeys = true;
-                        break;
-                    }
+                    valus.Push(argument);
                 }
             }
+
+            if (string.IsNullOrWhiteSpace(OutputDirectory))
+            {
+                if (ClientInfo == null)
+                {
+                    OutputDirectory = Environment.CurrentDirectory;
+                }
+                else
+                {
+                    OutputDirectory = ClientInfo.DirectoryName;
+                }
+            }
+            else OutputDirectory = Path.Combine(Environment.CurrentDirectory, OutputDirectory);
+        }
+
+        private bool ParseArgument(string argument, Stack<string> values)
+        {
+            switch (argument)
+            {
+                #region Argument: /dcrypto
+                case "/dcrypto":
+                IsDisablingHandshake = true;
+                break;
+                #endregion
+
+                #region Argument: /fetch
+                case "/fetch":
+                {
+                    if (values.Count > 0)
+                    {
+                        RemoteRevision = values.Pop();
+                    }
+                    IsFetchingClient = true;
+                    break;
+                }
+                #endregion
+
+                #region Argument: /clean
+                case "/clean":
+                IsSanitizing = true;
+                break;
+                #endregion
+
+                #region Argument: /dump
+                case "/dump":
+                IsDumpingMessageData = true;
+                break;
+                #endregion
+
+                #region Argument: /log
+                case "/log":
+                {
+                    IsInjectingMessageLogger = true;
+                    if (values.Count > 0)
+                    {
+                        LoggerFunctionName = values.Pop();
+                    }
+                    break;
+                }
+                #endregion
+
+                #region Argument: /kshout
+                case "/kshout":
+                IsInjectingKeyShouter = true;
+                break;
+                #endregion
+
+                #region Argument: /dhost
+                case "/dhost":
+                IsDisablingHostChecks = true;
+                break;
+                #endregion
+
+                #region Argument: /c
+                case "/c":
+                {
+                    var compression = CompressionKind.None;
+                    if (values.Count > 0 &&
+                        Enum.TryParse(values.Pop(), true, out compression))
+                    {
+                        Compression = compression;
+                    }
+                    break;
+                }
+                #endregion
+
+                #region Argument: /rev
+                case "/rev":
+                Revision = values.Pop();
+                break;
+                #endregion
+
+                #region Argument: /rsa
+                case "/rsa":
+                {
+                    if (values.Count >= 2)
+                    {
+                        string modulus = values.Pop();
+                        string exponent = values.Pop();
+                        Keys = new HBRSAKeys(modulus, exponent);
+                    }
+                    else if (values.Count == 1)
+                    {
+                        int keySize = 1024;
+                        int.TryParse(values.Pop(), out keySize);
+                        Keys = new HBRSAKeys(keySize);
+                    }
+                    else Keys = new HBRSAKeys();
+                    IsReplacingRSAKeys = true;
+                    break;
+                }
+                #endregion
+
+                #region Argument: /dir
+                case "/dir":
+                {
+                    OutputDirectory = values.Pop();
+                    break;
+                }
+                #endregion
+
+                default: return false;
+            }
+            return true;
         }
     }
 }
