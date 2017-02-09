@@ -19,6 +19,16 @@ namespace HabBit.Utilities
         public bool IsFetchingClient { get; set; }
 
         /// <summary>
+        /// Gets or sets a value that determines whether to enable the client's internal debug function.
+        /// </summary>
+        public bool IsEnablingDebugLogger { get; set; }
+
+        /// <summary>
+        /// Get or sets the name of the external function that will be invoked when a 'log(... args)' task is performed in the client.
+        /// </summary>
+        public string DebugLogFunctionName { get; set; }
+
+        /// <summary>
         /// Gets or sets the remote revion of the client to fetch.
         /// </summary>
         public string RemoteRevision { get; set; }
@@ -86,7 +96,7 @@ namespace HabBit.Utilities
         /// <summary>
         /// Get or sets the name of the external function that will be called with the array of values being sent/received.
         /// </summary>
-        public string LoggerFunctionName { get; set; }
+        public string MessageLogFunctionName { get; set; }
 
         /// <summary>
         /// Gets or sets a value that determines whether to call an external function every time a message is being sent/received with the array of values as a parameter.
@@ -160,13 +170,25 @@ namespace HabBit.Utilities
                 break;
                 #endregion
 
-                #region Argument: /log
-                case "/log":
+                #region Argument: /dlog
+                case "/dlog":
+                {
+                    IsEnablingDebugLogger = true;
+                    if (values.Count > 0)
+                    {
+                        DebugLogFunctionName = values.Pop();
+                    }
+                    break;
+                }
+                #endregion
+
+                #region Argument: /mlog
+                case "/mlog":
                 {
                     IsInjectingMessageLogger = true;
                     if (values.Count > 0)
                     {
-                        LoggerFunctionName = values.Pop();
+                        MessageLogFunctionName = values.Pop();
                     }
                     break;
                 }
