@@ -6,7 +6,7 @@ Command line tool for allowing the user to remove certain restrictions from the 
 * .NET Framework 4.0+
 
 ## Getting Started
-This section is for people who've never used a command line tool before, proceed to the next section for a table for available [arguments](https://github.com/ArachisH/HabBit#arguments).
+This section is for people who've never used a command line tool before, proceed to the next section for a table for available [arguments](#arguments).
 
 Download, and extract the latest release somewhere accessible on your computer, excluding your recycle bin.
 You can find the latest release here: https://github.com/ArachisH/HabBit/releases
