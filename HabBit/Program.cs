@@ -38,6 +38,7 @@ namespace HabBit
                     Options.IsDisablingHandshake ||
                     Options.IsDisablingHostChecks ||
                     Options.IsInjectingKeyShouter ||
+                    Options.IsEnablingDebugLogger ||
                     Options.IsInjectingMessageLogger ||
                     !string.IsNullOrWhiteSpace(Options.Revision));
             }
@@ -174,15 +175,26 @@ namespace HabBit
                 Game.DisableHostChecks().WriteLineResult();
             }
 
+            if (Options.IsEnablingDebugLogger)
+            {
+                Console.Write("Injecting Message Logger");
+                if (!string.IsNullOrWhiteSpace(Options.DebugLogFunctionName))
+                {
+                    Console.Write($"({Options.DebugLogFunctionName})");
+                }
+                Console.Write("...");
+                Game.EnableDebugLogger(Options.DebugLogFunctionName).WriteLineResult();
+            }
+
             if (Options.IsInjectingMessageLogger)
             {
                 Console.Write("Injecting Message Logger");
-                if (!string.IsNullOrWhiteSpace(Options.LoggerFunctionName))
+                if (!string.IsNullOrWhiteSpace(Options.MessageLogFunctionName))
                 {
-                    Console.Write($"({Options.LoggerFunctionName})");
+                    Console.Write($"({Options.MessageLogFunctionName})");
                 }
                 Console.Write("...");
-                Game.InjectMessageLogger(Options.LoggerFunctionName).WriteLineResult();
+                Game.InjectMessageLogger(Options.MessageLogFunctionName).WriteLineResult();
             }
 
             if (!string.IsNullOrWhiteSpace(Options.Revision))
