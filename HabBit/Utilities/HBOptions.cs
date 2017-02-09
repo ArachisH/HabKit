@@ -64,6 +64,16 @@ namespace HabBit.Utilities
         public HBRSAKeys Keys { get; set; }
 
         /// <summary>
+        /// Gets or sets whether to match the provided file of hashes against the current client hashes.
+        /// </summary>
+        public bool IsMatchingMessages { get; set; }
+
+        /// <summary>
+        /// Gets or sets the path of the file containing the hashes to match against the current client hashes.
+        /// </summary>
+        public FileInfo HashesInfo { get; set; }
+
+        /// <summary>
         /// Gets or sets a value that determines whether to override the client's internal public RSA keys.
         /// </summary>
         public bool IsReplacingRSAKeys { get; set; }
@@ -172,6 +182,15 @@ namespace HabBit.Utilities
                 case "/dhost":
                 IsDisablingHostChecks = true;
                 break;
+                #endregion
+
+                #region Argument /match
+                case "/match":
+                {
+                    IsMatchingMessages = true;
+                    HashesInfo = new FileInfo(values.Pop());
+                    break;
+                }
                 #endregion
 
                 #region Argument: /c
