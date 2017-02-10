@@ -25,12 +25,12 @@ HabBit.exe {Client Path.swf} /dhost /rsa /clean /dump
 ## Arguments
 | Argument State | Argument | Description                                                                                                    | Parameters                           | Value State  |
 |:--------------:|:--------:|:---------------------------------------------------------------------------------------------------------------|:------------------------------------:|:------------:|
-| **Optional**   | /c       | Compression to use when being assembling client.                                                               | none, zlib, lzma                     | **Optional** |
+| **Optional**   | /c       | Compression to use when assembling client.                                                                     | none, zlib, lzma                     | **Optional** |
 | **Optional**   | /clean   | Sanitizes the client by deobfuscating methods, and renaming invalid identifiers.                               | None                                 | **Optional** |
 | **Optional**   | /dcrypto | Disables all aspects of cryptography within the client(RC4/Handshake).                                         | None                                 | **Optional** |
 | **Optional**   | /dhost   | Disable certain methods in the client to allow it to run from any host.                                        | None                                 | **Optional** |
 | **Optional**   | /dump    | Dumps Outgoing/Incoming message data to a text file(Header, SHA1, Constructor Signature).                      | None                                 | **Optional** |
-| **Optional**   | /kshout  | Client will be forced to publicly share the DH(RC4 Stream Cypher) private key to any connected parties.        | None                                 | **Optional** |
+| **Optional**   | /kshout  | Client will be forced to publicly share the DH(RC4 Stream Cipher) private key to any connected parties.        | None                                 | **Optional** |
 | **Optional**   | /log     | Call an external function every time a message is being sent/received with the array of values as a parameter. | functionName                         | **Optional** |
 | **Optional**   | /rev     | Sets the client's revision value found in the Outgoing[4000] message class handler.                            | revision                             | **Required** |
 | **Optional**   | /rsa     | Override the client's internal public RSA keys with a newly generated pair, or an already existing one.        | rsaKeySize **OR** (modulus exponent) | **Optional** |
