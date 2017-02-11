@@ -22,20 +22,20 @@ We can now run some basic functions modifications on the client like so:
 HabBit.exe {Client Path.swf} /clean /dhost /rsa
 ```
 ## Arguments
-| Argument                                                    | Description                                                                                                                             | Parameter State |
-|:-----------------------------------------------------------:|:----------------------------------------------------------------------------------------------------------------------------------------|:---------------:|
-| /c (none, zlib, lzma)                                       | Compression to use when assembling client.                                                                                              | **Required**    |
-| /clean                                                      | Sanitizes the client by deobfuscating methods, and renaming invalid identifiers.                                                        | **Optional**    |
-| /dcrypto                                                    | Disables all aspects of cryptography within the client(RC4/Handshake).                                                                  | **Optional**    |
-| /dhost                                                      | Disable certain methods in the client to allow it to run from any host.                                                                 | **Optional**    |
-| /dlog (functionName)                                        | Enables the client's internal log function, and invokes the external function name **console.log** by default.                          | **Optional**    |
-| /dump                                                       | Dumps Outgoing/Incoming message data to a text file(Header, SHA1, Constructor Signature).                                               | **Optional**    |
-| /fetch (revisionName)                                       | Downloads the latest client, or a specific build based on the provided revision                                                         | **Optional**    |
-| /kshout                                                     | Client will be forced to publicly share the DH(RC4 Stream Cipher) private key to any connected parties.                                 | **Optional**    |
-| /match (clientName clientHeadersName serverHeadersName)     | Replaces the headers in the given Client/Server header files by comparing the hashes with the provided client, against the current one. | **Required**    |
-| /mlog (functionName)                                        | Call an external function every time a message is being sent/received with the array of values as a parameter.                          | **Optional**    |
-| /rev  (revisionName)                                        | Sets the client's revision value found in the Outgoing[4000] message class handler.                                                     | **Required**    |
-| /rsa (keySize | modulus exponent)                           | Override the client's internal public RSA keys with a newly generated pair, or an already existing one.                                 | **Optional**    |
+| Argument                                                | Description                                                                                                                             | Parameter State |
+|:-------------------------------------------------------:|:---------------------------------------------------------------------------------------------------------------------------------------:|----------------:|
+| /c (none, zlib, lzma)                                   | Compression to use when assembling client.                                                                                              | **Required**    |
+| /clean                                                  | Sanitizes the client by deobfuscating methods, and renaming invalid identifiers.                                                        | **Optional**    |
+| /dcrypto                                                | Disables all aspects of cryptography within the client(RC4/Handshake).                                                                  | **Optional**    |
+| /dhost                                                  | Disable certain methods in the client to allow it to run from any host.                                                                 | **Optional**    |
+| /dlog (functionName)                                    | Enables the client's internal log function, and invokes the external function name **console.log** by default.                          | **Optional**    |
+| /dump                                                   | Dumps Outgoing/Incoming message data to a text file(Header, SHA1, Constructor Signature).                                               | **Optional**    |
+| /fetch (revisionName)                                   | Downloads the latest client, or a specific build based on the provided revision                                                         | **Optional**    |
+| /kshout                                                 | Client will be forced to publicly share the DH(RC4 Stream Cipher) private key to any connected parties.                                 | **Optional**    |
+| /match (clientName clientHeadersName serverHeadersName) | Replaces the headers in the given Client/Server header files by comparing the hashes with the provided client, against the current one. | **Required**    |
+| /mlog (functionName)                                    | Call an external function every time a message is being sent/received with the array of values as a parameter.                          | **Optional**    |
+| /rev  (revisionName)                                    | Sets the client's revision value found in the Outgoing[4000] message class handler.                                                     | **Required**    |
+| /rsa (keySize, modulus exponent)                        | Override the client's internal public RSA keys with a newly generated pair, or an already existing one.                                 | **Optional**    |
 
 #### Default RSA Keys
 ```
