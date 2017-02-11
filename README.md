@@ -2,11 +2,10 @@
 Command line tool for allowing the user to remove certain restrictions from the Harble client that do not originally allow it to be used locally.
 
 ## Requirements
-* System32/cmd.exe
 * .NET Framework 4.0+
 
 ## Getting Started
-This section is for people who've never used a command line tool before, proceed to the next section for a table for available [arguments](#arguments).
+This section is for people who've never used a command line tool before, proceed to the next section for the list of [arguments](#arguments).
 
 Download, and extract the latest release somewhere accessible on your computer, excluding your recycle bin.
 You can find the latest release here: https://github.com/ArachisH/HabBit/releases/latest
@@ -18,30 +17,25 @@ Some black box should have appeared, the next step involves changing the current
 ```
 cd C:\Users\{Username}\Desktop\HabBit
 ```
-The next step is passing the path of the client to the executable, we can do this by simply dragging & dropping the file onto the command prompt after **HabBit.exe**.
+We can now run some basic functions modifications on the client like so:
 ```
-HabBit.exe {Client Path.swf} /dhost /rsa /clean /dump
+HabBit.exe {Client Path.swf} /clean /dhost /rsa
 ```
 ## Arguments
-| Argument State | Argument | Description                                                                                                    | Parameters                           | Value State  |
-|:--------------:|:--------:|:---------------------------------------------------------------------------------------------------------------|:------------------------------------:|:------------:|
-| **Optional**   | /c       | Compression to use when assembling client.                                                                     | none, zlib, lzma                     | **Optional** |
-| **Optional**   | /clean   | Sanitizes the client by deobfuscating methods, and renaming invalid identifiers.                               | None                                 | **Optional** |
-| **Optional**   | /dcrypto | Disables all aspects of cryptography within the client(RC4/Handshake).                                         | None                                 | **Optional** |
-| **Optional**   | /dhost   | Disable certain methods in the client to allow it to run from any host.                                        | None                                 | **Optional** |
-| **Optional**   | /dump    | Dumps Outgoing/Incoming message data to a text file(Header, SHA1, Constructor Signature).                      | None                                 | **Optional** |
-| **Optional**   | /kshout  | Client will be forced to publicly share the DH(RC4 Stream Cipher) private key to any connected parties.        | None                                 | **Optional** |
-| **Optional**   | /log     | Call an external function every time a message is being sent/received with the array of values as a parameter. | functionName                         | **Optional** |
-| **Optional**   | /rev     | Sets the client's revision value found in the Outgoing[4000] message class handler.                            | revision                             | **Required** |
-| **Optional**   | /rsa     | Override the client's internal public RSA keys with a newly generated pair, or an already existing one.        | rsaKeySize **OR** (modulus exponent) | **Optional** |
-
-### Dependent Default Values
-| Argument       | Description                                                                                                                                                                                                                                    |
-|:--------------:|:-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| /rsa           | Uses the default RSA keys                                                                                                                                                                                                                      |
-| /rsa (keySize) | If unable to parse the key size being specified, it will automatically fallback to **1024**.                                                                                                                                                   |
-| /c             | Utilizes the initial compression kind of the client prior to disassembling.                                                                                                                                                                    |
-| /log           | The default value for this argument is **null**, it will instead use the internal function name [ExternalFlashInterface.logDebug](https://github.com/ArachisH/HabBit/blob/90575fdd950a4b447c2a3765ce962eec0d0e4250/HabBit/Habbo/HGame.cs#L623) |
+| Argument                                                    | Description                                                                                                                             | Parameter State |
+|:-----------------------------------------------------------:|:----------------------------------------------------------------------------------------------------------------------------------------|:---------------:|
+| /c (none, zlib, lzma)                                       | Compression to use when assembling client.                                                                                              | **Required**    |
+| /clean                                                      | Sanitizes the client by deobfuscating methods, and renaming invalid identifiers.                                                        | **Optional**    |
+| /dcrypto                                                    | Disables all aspects of cryptography within the client(RC4/Handshake).                                                                  | **Optional**    |
+| /dhost                                                      | Disable certain methods in the client to allow it to run from any host.                                                                 | **Optional**    |
+| /dlog (functionName)                                        | Enables the client's internal log function, and invokes the external function name **console.log** by default.                          | **Optional**    |
+| /dump                                                       | Dumps Outgoing/Incoming message data to a text file(Header, SHA1, Constructor Signature).                                               | **Optional**    |
+| /fetch (revisionName)                                       | Downloads the latest client, or a specific build based on the provided revision                                                         | **Optional**    |
+| /kshout                                                     | Client will be forced to publicly share the DH(RC4 Stream Cipher) private key to any connected parties.                                 | **Optional**    |
+| /match (clientName clientHeadersName serverHeadersName)     | Replaces the headers in the given Client/Server header files by comparing the hashes with the provided client, against the current one. | **Required**    |
+| /mlog (functionName)                                        | Call an external function every time a message is being sent/received with the array of values as a parameter.                          | **Optional**    |
+| /rev  (revisionName)                                        | Sets the client's revision value found in the Outgoing[4000] message class handler.                                                     | **Required**    |
+| /rsa (keySize | modulus exponent)                           | Override the client's internal public RSA keys with a newly generated pair, or an already existing one.                                 | **Optional**    |
 
 #### Default RSA Keys
 ```
