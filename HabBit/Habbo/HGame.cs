@@ -537,8 +537,7 @@ namespace HabBit.Habbo
                 new GetLocal2Ins(),
                 new PushIntIns(abc, 4001),
                 new GetLocalIns(6),
-                new PushStringIns(abc, "123testing"),
-                new CallPropVoidIns(abc) { PropertyNameIndex = sendMessageQNameIndex, ArgCount = 3 }
+                new CallPropVoidIns(abc) { PropertyNameIndex = sendMessageQNameIndex, ArgCount = 2 }
             });
 
             pubKeyVerifyMethod.Body.Code = pubKeyVerCode.ToArray();
