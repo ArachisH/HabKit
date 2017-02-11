@@ -23,7 +23,7 @@ HabBit.exe {Client Path.swf} /clean /dhost /rsa
 ```
 ## Arguments
 | Argument                                                | Description                                                                                                                             | Parameter State |
-|:-------------------------------------------------------:|:---------------------------------------------------------------------------------------------------------------------------------------:|----------------:|
+|:-------------------------------------------------------:|:---------------------------------------------------------------------------------------------------------------------------------------:|:---------------:|
 | /c (none, zlib, lzma)                                   | Compression to use when assembling client.                                                                                              | **Required**    |
 | /clean                                                  | Sanitizes the client by deobfuscating methods, and renaming invalid identifiers.                                                        | **Optional**    |
 | /dcrypto                                                | Disables all aspects of cryptography within the client(RC4/Handshake).                                                                  | **Optional**    |
