@@ -4,6 +4,7 @@ using System.Net;
 using System.Linq;
 using System.Reflection;
 using System.Collections.Generic;
+using System.Text.RegularExpressions;
 
 using HabBit.Habbo;
 using HabBit.Utilities;
@@ -149,7 +150,7 @@ namespace HabBit
             if (Options.IsSanitizing)
             {
                 Console.Write("Sanitizing...");
-                Game.Sanitize();
+                Game.Sanitize(Sanitization.All);
                 ConsoleEx.WriteLineFinished();
             }
 
@@ -209,40 +210,29 @@ namespace HabBit
         {
             ConsoleEx.WriteLineTitle("Extracting");
 
-            Console.Write("Generating Message Profiles...");
+            Console.Write("Generating Message Hashes...");
             Game.GenerateMessageHashes();
             ConsoleEx.WriteLineFinished();
 
             if (Options.IsMatchingMessages)
             {
-                using (var hashesStream = File.OpenRead(Options.HashesInfo.FullName))
-                using (var hashesInput = new BinaryReader(hashesStream))
+                using (var compareGame = new HGame(Options.CompareInfo.FullName))
                 {
-                    int messageCount = hashesInput.ReadInt32();
-                    string revision = hashesInput.ReadString();
+                    Console.Write("Preparing Hash Comparison...");
+                    compareGame.Disassemble();
+                    compareGame.GenerateMessageHashes();
+                    ConsoleEx.WriteLineFinished();
 
-                    int duplicateMatches = 0;
-                    int unmatchedMessages = 0;
-                    Console.Write($"Matching Messages({revision})...");
-                    for (int i = 0; i < messageCount; i++)
-                    {
-                        bool isOutgoing = hashesInput.ReadBoolean();
-                        ushort header = hashesInput.ReadUInt16();
-                        string sha1 = hashesInput.ReadString();
+                    Console.Write($"Matching Outgoing Messages({compareGame.Revision})...");
+                    Tuple<int, int> outResult = ReplaceHeaders(Options.ClientHeadersInfo, compareGame.OutMessages, compareGame.Revision);
 
-                        var message = new HGame.MessageItem(header, isOutgoing);
-                        message.SHA1 = sha1;
+                    Console.Write($" | Matches: {outResult.Item1}/{outResult.Item2}");
+                    ConsoleEx.WriteLineFinished();
 
-                        List<HGame.MessageItem> messages = null;
-                        if (Game.Messages.TryGetValue(sha1, out messages))
-                        {
-                            if (messages.Count > 1)
-                            {
-                                duplicateMatches++;
-                            }
-                        }
-                        else unmatchedMessages++;
-                    }
+                    Console.Write($"Matching Incoming Messages({compareGame.Revision})...");
+                    Tuple<int, int> inResult = ReplaceHeaders(Options.ServerHeadersInfo, compareGame.InMessages, compareGame.Revision);
+
+                    Console.Write($" | Matches: {inResult.Item1}/{inResult.Item2}");
                     ConsoleEx.WriteLineFinished();
                 }
             }
@@ -294,31 +284,6 @@ namespace HabBit
 
                     Console.WriteLine("Messages Saved: " + msgsPath);
                 }
-
-                string hashesPath = Path.Combine(Options.OutputDirectory, "Messages.hshs");
-                using (var hashesStream = File.Open(hashesPath, FileMode.Create))
-                using (var hashesOutput = new BinaryWriter(hashesStream))
-                {
-                    hashesStream.Position += 4;
-                    hashesOutput.Write(Game.Revision);
-
-                    int count = 0;
-                    foreach (KeyValuePair<ushort, HGame.MessageItem> messagePair in
-                        Game.OutMessages.Concat(Game.InMessages))
-                    {
-                        count++;
-                        ushort header = messagePair.Key;
-                        HGame.MessageItem message = messagePair.Value;
-
-                        hashesOutput.Write(message.IsOutgoing);
-                        hashesOutput.Write(header);
-                        hashesOutput.Write(message.SHA1);
-                    }
-
-                    hashesStream.Position = 0;
-                    hashesOutput.Write(count);
-                    Console.WriteLine("Message Hashes Saved: " + hashesPath);
-                }
             }
             #endregion
         }
@@ -342,7 +307,7 @@ namespace HabBit
             Console.WriteLine("Revision: " + Game.Revision);
         }
 
-        private void WriteMessage(StreamWriter output, HGame.MessageItem message)
+        private void WriteMessage(StreamWriter output, MessageItem message)
         {
             ASInstance instance = message.Class.Instance;
 
@@ -356,11 +321,11 @@ namespace HabBit
             }
             output.WriteLine();
         }
-        private void WriteMessages(StreamWriter output, string title, IDictionary<ushort, HGame.MessageItem> messages)
+        private void WriteMessages(StreamWriter output, string title, IDictionary<ushort, MessageItem> messages)
         {
-            var deadMessages = new SortedDictionary<ushort, HGame.MessageItem>();
-            var hashCollisions = new Dictionary<string, SortedList<ushort, HGame.MessageItem>>();
-            foreach (HGame.MessageItem message in messages.Values)
+            var deadMessages = new SortedDictionary<ushort, MessageItem>();
+            var hashCollisions = new Dictionary<string, SortedList<ushort, MessageItem>>();
+            foreach (MessageItem message in messages.Values)
             {
                 if (message.References.Count == 0)
                 {
@@ -369,10 +334,10 @@ namespace HabBit
                 }
 
                 string sha1 = message.SHA1;
-                SortedList<ushort, HGame.MessageItem> hashes = null;
+                SortedList<ushort, MessageItem> hashes = null;
                 if (!hashCollisions.TryGetValue(sha1, out hashes))
                 {
-                    hashes = new SortedList<ushort, HGame.MessageItem>();
+                    hashes = new SortedList<ushort, MessageItem>();
                     hashCollisions.Add(sha1, hashes);
                 }
                 hashes.Add(message.Header, message);
@@ -385,7 +350,7 @@ namespace HabBit
                 hashCollisions.Remove(hash);
             }
 
-            foreach (HGame.MessageItem message in messages.Values)
+            foreach (MessageItem message in messages.Values)
             {
                 string sha1 = message.SHA1;
                 if (hashCollisions.ContainsKey(sha1)) continue;
@@ -399,10 +364,10 @@ namespace HabBit
             {
                 output.WriteLine();
                 output.WriteLine($"// {title} Message Hash Collisions");
-                foreach (SortedList<ushort, HGame.MessageItem> hashes in hashCollisions.Values)
+                foreach (SortedList<ushort, MessageItem> hashes in hashCollisions.Values)
                 {
                     if (hashes.Count < 2) continue;
-                    foreach (HGame.MessageItem message in hashes.Values)
+                    foreach (MessageItem message in hashes.Values)
                     {
                         output.Write(title);
                         output.Write($"[Collisions: {hashes.Count}]");
@@ -413,12 +378,86 @@ namespace HabBit
 
             output.WriteLine();
             output.WriteLine($"// {title} Dead Messages");
-            foreach (HGame.MessageItem message in deadMessages.Values)
+            foreach (MessageItem message in deadMessages.Values)
             {
                 output.Write(title);
                 output.Write("[Dead]");
                 WriteMessage(output, message);
             }
+        }
+
+        private Tuple<int, int> ReplaceHeaders(FileInfo file, IDictionary<ushort, MessageItem> messages, string revision)
+        {
+            int totalMatches = 0;
+            int totalValidAttempts = 0; // If no message exist, or is an invalid header, do not count towards total attempts. (Not my fault no matches are found, bruh)
+            string copyPath = Path.Combine(Options.OutputDirectory, file.Name);
+            using (var fileStream = File.OpenRead(file.FullName))
+            using (var fileOutput = new StreamReader(fileStream))
+            using (var replaceStream = File.Open(copyPath, FileMode.Create))
+            using (var replaceOutput = new StreamWriter(replaceStream))
+            {
+                replaceOutput.WriteLine("// Current: " + Game.Revision);
+                replaceOutput.WriteLine("// Previous: " + revision);
+                while (!fileOutput.EndOfStream)
+                {
+                    string line = fileOutput.ReadLine();
+                    if (line.Contains("//"))
+                    {
+                        line = Regex.Replace(line, "//(.*?)$", string.Empty);
+                        if (string.IsNullOrWhiteSpace(line)) continue;
+                    }
+
+                    line = line.TrimEnd();
+                    Match declaration = Regex.Match(line, @"(?<start>(.*?))(?<header>[+-]?[0-9]\d*(\.\d+)?)\b(?<end>[^\r|$]*)");
+                    if (declaration.Success)
+                    {
+                        ushort prevHeader = 0;
+                        var suffix = string.Empty;
+                        MessageItem prevMessage = null;
+                        List<MessageItem> group = null;
+
+                        string end = declaration.Groups["end"].Value;
+                        string start = declaration.Groups["start"].Value;
+                        string headerString = declaration.Groups["header"].Value;
+
+                        totalValidAttempts++;
+                        if (!ushort.TryParse(headerString, out prevHeader))
+                        {
+                            totalValidAttempts--;
+                            suffix = " //! Invalid Header";
+                        }
+                        else if (!messages.TryGetValue(prevHeader, out prevMessage))
+                        {
+                            totalValidAttempts--;
+                            headerString = "-1";
+                            suffix = $" //! Unknown Message({prevHeader})";
+                        }
+                        else if (!Game.Messages.TryGetValue(prevMessage.SHA1, out group))
+                        {
+                            headerString = "-1";
+                            suffix = $" //! Zero Matches({prevHeader})";
+                        }
+                        else if (group.Count > 1)
+                        {
+                            // Too risky to set a header from one of the possible messages, set as invalid.
+                            // Maybe one day, we'll do a seperate type of scan for these, to check similarities.
+                            headerString = "-1";
+                            suffix = $" //! Duplicate Matches({prevHeader})";
+                        }
+                        else
+                        {
+                            MessageItem message = group[0];
+                            headerString = message.Header.ToString();
+
+                            totalMatches++;
+                            suffix = (" // " + prevHeader);
+                        }
+                        line = $"{start}{headerString}{end}{suffix}";
+                    }
+                    replaceOutput.WriteLine(line);
+                }
+            }
+            return Tuple.Create(totalMatches, totalValidAttempts);
         }
     }
 }
