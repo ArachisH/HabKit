@@ -28,6 +28,7 @@ HabBit.exe {Client Path.swf} /clean /dhost /rsa
 | /clean                                                  | Sanitizes the client by deobfuscating methods, and renaming invalid identifiers.                                                        | **Optional**    |
 | /dcrypto                                                | Disables all aspects of cryptography within the client(RC4/Handshake).                                                                  | **Optional**    |
 | /dhost                                                  | Disable certain methods in the client to allow it to run from any host.                                                                 | **Optional**    |
+| /dir (directoryName)                                    | Specify a custom output directory, rather than defaulting to the base directory of the specified client.                                | **Required**    |
 | /dlog (functionName)                                    | Enables the client's internal log function, and invokes the external function name **console.log** by default.                          | **Optional**    |
 | /dump                                                   | Dumps Outgoing/Incoming message data to a text file(Header, SHA1, Constructor Signature).                                               | **Optional**    |
 | /fetch (revisionName)                                   | Downloads the latest client, or a specific build based on the provided revision                                                         | **Optional**    |
