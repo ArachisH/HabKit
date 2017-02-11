@@ -79,9 +79,19 @@ namespace HabBit.Utilities
         public bool IsMatchingMessages { get; set; }
 
         /// <summary>
-        /// Gets or sets the path of the file containing the hashes to match against the current client hashes.
+        /// Gets or sets the client file that will be compared to the current client for hash matches.
         /// </summary>
-        public FileInfo HashesInfo { get; set; }
+        public FileInfo CompareInfo { get; set; }
+
+        /// <summary>
+        /// Gets or sets the file containing the Outgoing headers relative to the client.
+        /// </summary>
+        public FileInfo ClientHeadersInfo { get; set; }
+
+        /// <summary>
+        /// Gets or sets the file containing the Incoming headers relative to the client.
+        /// </summary>
+        public FileInfo ServerHeadersInfo { get; set; }
 
         /// <summary>
         /// Gets or sets a value that determines whether to override the client's internal public RSA keys.
@@ -210,7 +220,9 @@ namespace HabBit.Utilities
                 case "/match":
                 {
                     IsMatchingMessages = true;
-                    HashesInfo = new FileInfo(values.Pop());
+                    CompareInfo = new FileInfo(values.Pop());
+                    ClientHeadersInfo = new FileInfo(values.Pop());
+                    ServerHeadersInfo = new FileInfo(values.Pop());
                     break;
                 }
                 #endregion
