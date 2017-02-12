@@ -1044,6 +1044,7 @@ namespace HabBit.Habbo
 
         public ASClass Class { get; }
         public ASClass Parser { get; }
+        public string[] Structure { get; }
         public List<MessageReference> References { get; }
 
         public MessageItem()
@@ -1059,8 +1060,9 @@ namespace HabBit.Habbo
             Class = @class;
             if (!IsOutgoing)
             {
-                Parser = GetMessageParser(Class);
+                Parser = GetMessageParser();
             }
+            Structure = (IsOutgoing ? GetOutgoingStructure(Class) : new string[0]);
         }
 
         public string GenerateSHA1()
@@ -1079,11 +1081,10 @@ namespace HabBit.Habbo
                 return SHA1;
             }
         }
-        private ASClass GetMessageParser(ASClass @class)
+        private ASClass GetMessageParser()
         {
-            ABCFile abc = @class.GetABC();
-            ASInstance instance = @class.Instance;
-
+            ABCFile abc = Class.GetABC();
+            ASInstance instance = Class.Instance;
             ASInstance superInstance = abc.GetFirstInstance(instance.Super.Name);
             ASMultiname parserType = superInstance.GetMethod(0, "parser").ReturnType;
 
@@ -1119,6 +1120,206 @@ namespace HabBit.Habbo
                 }
             }
             return null;
+        }
+
+        private string[] GetOutgoingStructure(ASClass @class)
+        {
+            ASMethod getArrayMethod = @class.Instance.GetMethods(0, "Array").FirstOrDefault();
+            if (getArrayMethod == null)
+            {
+                ASClass superClass = @class.GetABC().GetFirstClass(@class.Instance.Super.Name);
+                return GetOutgoingStructure(superClass);
+            }
+            ASCode getArrayCode = getArrayMethod.Body.ParseCode();
+            if (getArrayMethod.Body.Exceptions.Count > 0 ||
+                getArrayCode.JumpExits.Count > 0 ||
+                getArrayCode.SwitchExits.Count > 0)
+            {
+                // Unable to parse data structure that relies on user input that is not present,
+                // since the structure may change based on the provided input.
+                return new string[0];
+            }
+
+            ASInstruction resultPusher = null;
+            for (int i = getArrayCode.Count - 1; i >= 0; i--)
+            {
+                ASInstruction instruction = getArrayCode[i];
+                if (instruction.OP == OPCode.ReturnValue)
+                {
+                    resultPusher = getArrayCode[i - 1];
+                    break;
+                }
+            }
+
+            int argCount = -1;
+            if (resultPusher.OP == OPCode.ConstructProp)
+            {
+                argCount = ((ConstructPropIns)resultPusher).ArgCount;
+            }
+            else if (resultPusher.OP == OPCode.NewArray)
+            {
+                argCount = ((NewArrayIns)resultPusher).ArgCount;
+            }
+
+            if (argCount > 0)
+            {
+                return GetOutgoingArrayStructure(getArrayCode, resultPusher, argCount);
+            }
+            else if (argCount == 0 ||
+                resultPusher.OP == OPCode.PushNull)
+            {
+                return new string[0];
+            }
+
+            if (resultPusher.OP == OPCode.GetProperty)
+            {
+                var getProperty = (GetPropertyIns)resultPusher;
+                return GetOutgoingConstructorStructure(getProperty.PropertyName);
+            }
+            else if (Local.IsGetLocal(resultPusher.OP))
+            {
+                return GetOutgoingLocalStructure(getArrayCode, (Local)resultPusher);
+            }
+            return new string[0];
+        }
+        private string[] GetOutgoingLocalStructure(ASCode code, Local getLocal)
+        {
+            var structure = new List<string>();
+            for (int i = 0; i < code.Count; i++)
+            {
+                ASInstruction instruction = code[i];
+                if (instruction == getLocal) break;
+                if (!Local.IsGetLocal(instruction.OP)) continue;
+
+                var local = (Local)instruction;
+                if (local.Register != getLocal.Register) continue;
+
+                for (i += 1; i < code.Count; i++)
+                {
+                    ASInstruction next = code[i];
+                    if (next.OP != OPCode.CallPropVoid) continue;
+
+                    var callPropVoid = (CallPropVoidIns)next;
+                    if (callPropVoid.PropertyName.Name != "push") continue;
+
+                    ASInstruction previous = code[i - 1];
+                    if (previous.OP == OPCode.GetProperty)
+                    {
+                        ASClass classToCheck = Class;
+                        var getProperty = (GetPropertyIns)previous;
+                        ASMultiname propertyName = getProperty.PropertyName;
+
+                        ASInstruction beforeGetProp = code[i - 2];
+                        if (beforeGetProp.OP == OPCode.GetLex)
+                        {
+                            var getLex = (GetLexIns)beforeGetProp;
+                            classToCheck = classToCheck.GetABC().GetFirstClass(getLex.TypeName.Name);
+                        }
+
+                        ASMultiname propertyType = null;
+                        if (TryGetTraitType(classToCheck, propertyName, out propertyType) ||
+                            TryGetTraitType(classToCheck.Instance, propertyName, out propertyType))
+                        {
+                            structure.Add(propertyType.Name);
+                        }
+                    }
+                }
+            }
+            return structure.ToArray();
+        }
+        private string[] GetOutgoingConstructorStructure(ASMultiname propertyName)
+        {
+            return new string[0];
+        }
+        private string[] GetOutgoingArrayStructure(ASCode code, ASInstruction beforeReturn, int length)
+        {
+            var getLocalEndIndex = -1;
+            int pushingEndIndex = code.IndexOf(beforeReturn);
+
+            var structure = new string[length];
+            ASInstance instance = Class.Instance;
+            var pushedLocals = new Dictionary<int, int>();
+            for (int i = pushingEndIndex - 1; i >= 0; i--)
+            {
+                ASInstruction instruction = code[i];
+                if (instruction.OP == OPCode.GetProperty)
+                {
+                    ASClass classToCheck = Class;
+                    var getProperty = (GetPropertyIns)instruction;
+                    ASMultiname propertyName = getProperty.PropertyName;
+
+                    ASInstruction previous = code[i - 1];
+                    if (previous.OP == OPCode.GetLex)
+                    {
+                        var getLex = (GetLexIns)previous;
+                        classToCheck = classToCheck.GetABC().GetFirstClass(getLex.TypeName.Name);
+                    }
+
+                    ASMultiname propertyType = null;
+                    if (TryGetTraitType(classToCheck, propertyName, out propertyType) ||
+                        TryGetTraitType(classToCheck.Instance, propertyName, out propertyType))
+                    {
+                        structure[--length] = propertyType.Name;
+                    }
+                }
+                else if (Local.IsGetLocal(instruction.OP) &&
+                    instruction.OP != OPCode.GetLocal_0)
+                {
+                    var local = (Local)instruction;
+                    pushedLocals.Add(local.Register, --length);
+                    if (getLocalEndIndex == -1)
+                    {
+                        getLocalEndIndex = i;
+                    }
+                }
+                if (length == 0) break;
+            }
+            for (int i = (getLocalEndIndex - 1); i >= 0; i--)
+            {
+                ASInstruction instruction = code[i];
+                if (!Local.IsSetLocal(instruction.OP)) continue;
+
+                int structIndex = 0;
+                var local = (Local)instruction;
+                if (pushedLocals.TryGetValue(local.Register, out structIndex))
+                {
+                    ASInstruction beforeSet = code[i - 1];
+                    pushedLocals.Remove(local.Register);
+                    switch (beforeSet.OP)
+                    {
+                        case OPCode.PushInt:
+                        case OPCode.PushByte:
+                        case OPCode.Convert_i:
+                        structure[structIndex] = "int";
+                        break;
+
+                        case OPCode.Coerce_s:
+                        case OPCode.PushString:
+                        structure[structIndex] = "String";
+                        break;
+
+                        case OPCode.PushTrue:
+                        case OPCode.PushFalse:
+                        structure[structIndex] = "Boolean";
+                        break;
+
+                        default:
+                        throw new Exception($"Don't know what this value type is, tell someone about this please.\r\nOP: {beforeSet.OP}");
+                    }
+                }
+                if (pushedLocals.Count == 0) break;
+            }
+            return structure;
+        }
+        
+        private bool TryGetTraitType(ASContainer container, ASMultiname propertyName, out ASMultiname propertyType)
+        {
+            ASTrait propertyTrait = container.GetTraits(TraitKind.Slot, TraitKind.Constant)
+                .Where(t => t.QName == propertyName)
+                .FirstOrDefault();
+
+            propertyType = propertyTrait?.Type;
+            return (propertyType != null);
         }
 
         private void Write(BinaryWriter output)
