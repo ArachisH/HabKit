@@ -85,8 +85,10 @@ namespace HabBit
             {
                 Fetch();
             }
-
-            Disassemble();
+            if (IsModifying || IsExtracting)
+            {
+                Disassemble();
+            }
             if (IsModifying)
             {
                 Modify();
@@ -95,7 +97,10 @@ namespace HabBit
             {
                 Extract();
             }
-            Assemble();
+            if (IsModifying)
+            {
+                Assemble();
+            }
         }
         private void Fetch()
         {
