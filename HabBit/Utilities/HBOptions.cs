@@ -54,7 +54,7 @@ namespace HabBit.Utilities
         public bool IsDisablingHostChecks { get; set; }
 
         /// <summary>
-        /// Gets or sets a value that determines whether to dump Outgoing/Incoming message data to a text file(Header, SHA1, Constructor Signature).
+        /// Gets or sets a value that determines whether to dump Outgoing/Incoming message data to a text file(Header, MD5, Constructor Signature).
         /// </summary>
         public bool IsDumpingMessageData { get; set; }
 
