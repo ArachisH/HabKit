@@ -319,7 +319,7 @@ namespace HabBit
             string name = instance.QName.Name;
             string constructorSig = instance.Constructor.ToAS3(true);
 
-            output.Write($"[{message.Header}, {message.SHA1}] = {name}{constructorSig}");
+            output.Write($"[{message.Header}, {message.MD5}] = {name}{constructorSig}");
             if (!message.IsOutgoing)
             {
                 output.Write($"[Parser: {message.Parser.Instance.QName.Name}]");
@@ -338,12 +338,12 @@ namespace HabBit
                     continue;
                 }
 
-                string sha1 = message.SHA1;
+                string md5 = message.MD5;
                 SortedList<ushort, MessageItem> hashes = null;
-                if (!hashCollisions.TryGetValue(sha1, out hashes))
+                if (!hashCollisions.TryGetValue(md5, out hashes))
                 {
                     hashes = new SortedList<ushort, MessageItem>();
-                    hashCollisions.Add(sha1, hashes);
+                    hashCollisions.Add(md5, hashes);
                 }
                 hashes.Add(message.Header, message);
             }
@@ -357,8 +357,8 @@ namespace HabBit
 
             foreach (MessageItem message in messages.Values)
             {
-                string sha1 = message.SHA1;
-                if (hashCollisions.ContainsKey(sha1)) continue;
+                string md5 = message.MD5;
+                if (hashCollisions.ContainsKey(md5)) continue;
                 if (message.References.Count == 0) continue;
 
                 output.Write(title);
@@ -437,7 +437,7 @@ namespace HabBit
                             headerString = "-1";
                             suffix = $" //! Unknown Message({prevHeader})";
                         }
-                        else if (!Game.Messages.TryGetValue(prevMessage.SHA1, out group))
+                        else if (!Game.Messages.TryGetValue(prevMessage.MD5, out group))
                         {
                             headerString = "-1";
                             suffix = $" //! Zero Matches({prevHeader})";
