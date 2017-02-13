@@ -2,7 +2,6 @@
 using System.IO;
 using System.Linq;
 using System.Collections.Generic;
-using System.Security.Cryptography;
 
 using Flazzy;
 using Flazzy.IO;
@@ -348,12 +347,12 @@ namespace HabBit.Habbo
             FindMessageReferences(ABCFiles[2]);
             foreach (MessageItem message in _messages.Values)
             {
-                message.GenerateSHA1();
+                message.GenerateHash();
                 List<MessageItem> group = null;
-                if (!Messages.TryGetValue(message.SHA1, out group))
+                if (!Messages.TryGetValue(message.MD5, out group))
                 {
                     group = new List<MessageItem>();
-                    Messages.Add(message.SHA1, group);
+                    Messages.Add(message.MD5, group);
                 }
                 group.Add(message);
             }
@@ -1040,7 +1039,7 @@ namespace HabBit.Habbo
     {
         public ushort Header { get; }
         public bool IsOutgoing { get; }
-        public string SHA1 { get; private set; }
+        public string MD5 { get; private set; }
 
         public ASClass Class { get; }
         public ASClass Parser { get; }
@@ -1062,23 +1061,25 @@ namespace HabBit.Habbo
             {
                 Parser = GetMessageParser();
             }
-            Structure = (IsOutgoing ? GetOutgoingStructure(Class) : new string[0]);
+            else
+            {
+                Structure = GetOutgoingStructure(Class);
+            }
         }
 
-        public string GenerateSHA1()
+        public string GenerateHash()
         {
-            using (var sha1 = new SHA1Managed())
-            using (var sha1Mem = new MemoryStream())
-            using (var crypto = new CryptoStream(sha1Mem, sha1, CryptoStreamMode.Write))
-            using (var output = new BinaryWriter(crypto))
+            using (var md5 = System.Security.Cryptography.MD5.Create())
+            using (var outputMem = new MemoryStream())
+            using (var output = new BinaryWriter(outputMem))
             {
                 Write(output);
-                crypto.FlushFinalBlock();
+                outputMem.Position = 0;
 
-                SHA1 = BitConverter.ToString(sha1.Hash)
+                MD5 = BitConverter.ToString(md5.ComputeHash(outputMem))
                     .Replace("-", string.Empty).ToLower();
 
-                return SHA1;
+                return MD5;
             }
         }
         private ASClass GetMessageParser()
@@ -1130,14 +1131,15 @@ namespace HabBit.Habbo
                 ASClass superClass = @class.GetABC().GetFirstClass(@class.Instance.Super.Name);
                 return GetOutgoingStructure(superClass);
             }
+            if (getArrayMethod.Body.Exceptions.Count > 0) return null;
             ASCode getArrayCode = getArrayMethod.Body.ParseCode();
-            if (getArrayMethod.Body.Exceptions.Count > 0 ||
-                getArrayCode.JumpExits.Count > 0 ||
+
+            if (getArrayCode.JumpExits.Count > 0 ||
                 getArrayCode.SwitchExits.Count > 0)
             {
                 // Unable to parse data structure that relies on user input that is not present,
                 // since the structure may change based on the provided input.
-                return new string[0];
+                return null;
             }
 
             ASInstruction resultPusher = null;
@@ -1168,19 +1170,19 @@ namespace HabBit.Habbo
             else if (argCount == 0 ||
                 resultPusher.OP == OPCode.PushNull)
             {
-                return new string[0];
+                return null;
             }
 
             if (resultPusher.OP == OPCode.GetProperty)
             {
                 var getProperty = (GetPropertyIns)resultPusher;
-                return GetOutgoingConstructorStructure(getProperty.PropertyName);
+                return GetOutgoingConstructorStructure(Class, getProperty.PropertyName);
             }
             else if (Local.IsGetLocal(resultPusher.OP))
             {
                 return GetOutgoingLocalStructure(getArrayCode, (Local)resultPusher);
             }
-            return new string[0];
+            return null;
         }
         private string[] GetOutgoingLocalStructure(ASCode code, Local getLocal)
         {
@@ -1216,20 +1218,129 @@ namespace HabBit.Habbo
                             classToCheck = classToCheck.GetABC().GetFirstClass(getLex.TypeName.Name);
                         }
 
-                        ASMultiname propertyType = null;
-                        if (TryGetTraitType(classToCheck, propertyName, out propertyType) ||
-                            TryGetTraitType(classToCheck.Instance, propertyName, out propertyType))
+                        string propertyTypeName = null;
+                        if (TryGetTraitTypeName(classToCheck, propertyName, out propertyTypeName) ||
+                            TryGetTraitTypeName(classToCheck.Instance, propertyName, out propertyTypeName))
                         {
-                            structure.Add(propertyType.Name);
+                            structure.Add(propertyTypeName);
                         }
                     }
                 }
             }
             return structure.ToArray();
         }
-        private string[] GetOutgoingConstructorStructure(ASMultiname propertyName)
+        private string[] GetOutgoingConstructorStructure(ASClass @class, ASMultiname propertyName)
         {
-            return new string[0];
+            ASMethod constructor = @class.Instance.Constructor;
+            if (constructor.Body.Exceptions.Count > 0) return null;
+            ASCode code = constructor.Body.ParseCode();
+
+            if (code.JumpExits.Count > 0 ||
+                code.SwitchExits.Count > 0)
+            {
+                return null;
+            }
+
+            var structure = new List<string>();
+            var pushedLocals = new Dictionary<int, int>();
+            for (int i = 0; i < code.Count; i++)
+            {
+                ASInstruction next = null;
+                ASInstruction instruction = code[i];
+                if (instruction.OP == OPCode.NewArray)
+                {
+                    var newArray = (NewArrayIns)instruction;
+                    if (newArray.ArgCount > 0)
+                    {
+                        var structArray = new string[newArray.ArgCount];
+                        for (int j = i - 1, length = newArray.ArgCount; j >= 0; j--)
+                        {
+                            ASInstruction previous = code[j];
+                            if (Local.IsGetLocal(previous.OP) &&
+                                previous.OP != OPCode.GetLocal_0)
+                            {
+                                var local = (Local)previous;
+                                ASParameter parameter = constructor.Parameters[local.Register - 1];
+                                structArray[--length] = parameter.Type.Name;
+                            }
+                            if (length == 0)
+                            {
+                                structure.AddRange(structArray);
+                                break;
+                            }
+                        }
+                    }
+                }
+                else if (instruction.OP == OPCode.ConstructSuper)
+                {
+                    var constructSuper = (ConstructSuperIns)instruction;
+                    if (constructSuper.ArgCount > 0)
+                    {
+                        ASClass superClass = @class.GetABC().GetFirstClass(@class.Instance.Super.Name);
+                        structure.AddRange(GetOutgoingConstructorStructure(superClass, propertyName));
+                    }
+                }
+                if (instruction.OP != OPCode.GetProperty) continue;
+
+                var getProperty = (GetPropertyIns)instruction;
+                if (getProperty.PropertyName != propertyName) continue;
+
+                next = code[++i];
+                ASClass classToCheck = @class;
+                if (Local.IsGetLocal(next.OP))
+                {
+                    if (next.OP == OPCode.GetLocal_0)
+                    {
+                        classToCheck = @class;
+                        continue;
+                    }
+
+                    var local = (Local)next;
+                    ASParameter parameter = constructor.Parameters[local.Register - 1];
+                    structure.Add(parameter.Type.Name);
+                }
+                else
+                {
+                    if (next.OP == OPCode.FindPropStrict)
+                    {
+                        classToCheck = null;
+                    }
+                    else if (next.OP == OPCode.GetLex)
+                    {
+                        var getLex = (GetLexIns)next;
+                        classToCheck = classToCheck.GetABC().GetFirstClass(getLex.TypeName.Name);
+                    }
+                    do
+                    {
+                        next = code[++i];
+                        propertyName = null;
+                        if (next.OP == OPCode.GetProperty)
+                        {
+                            getProperty = (GetPropertyIns)next;
+                            propertyName = getProperty.PropertyName;
+                        }
+                        else if (next.OP == OPCode.CallProperty)
+                        {
+                            var callProperty = (CallPropertyIns)next;
+                            propertyName = callProperty.PropertyName;
+                        }
+                    }
+                    while (next.OP != OPCode.GetProperty && next.OP != OPCode.CallProperty);
+
+                    string propertyTypeName = null;
+                    if (TryGetTraitTypeName(classToCheck, propertyName, out propertyTypeName) ||
+                        TryGetTraitTypeName(classToCheck?.Instance, propertyName, out propertyTypeName))
+                    {
+                        structure.Add(propertyTypeName);
+                    }
+                }
+            }
+            if (structure.Contains("Array"))
+            {
+                // External array... impossible to check what value types are contained in this.
+                return null;
+            }
+            return structure.ToArray();
         }
         private string[] GetOutgoingArrayStructure(ASCode code, ASInstruction beforeReturn, int length)
         {
@@ -1255,11 +1366,11 @@ namespace HabBit.Habbo
                         classToCheck = classToCheck.GetABC().GetFirstClass(getLex.TypeName.Name);
                     }
 
-                    ASMultiname propertyType = null;
-                    if (TryGetTraitType(classToCheck, propertyName, out propertyType) ||
-                        TryGetTraitType(classToCheck.Instance, propertyName, out propertyType))
+                    string propertyTypeName = null;
+                    if (TryGetTraitTypeName(classToCheck, propertyName, out propertyTypeName) ||
+                        TryGetTraitTypeName(classToCheck.Instance, propertyName, out propertyTypeName))
                     {
-                        structure[--length] = propertyType.Name;
+                        structure[--length] = propertyTypeName;
                     }
                 }
                 else if (Local.IsGetLocal(instruction.OP) &&
@@ -1311,15 +1422,32 @@ namespace HabBit.Habbo
             }
             return structure;
         }
-        
-        private bool TryGetTraitType(ASContainer container, ASMultiname propertyName, out ASMultiname propertyType)
-        {
-            ASTrait propertyTrait = container.GetTraits(TraitKind.Slot, TraitKind.Constant)
-                .Where(t => t.QName == propertyName)
-                .FirstOrDefault();
 
-            propertyType = propertyTrait?.Type;
-            return (propertyType != null);
+        private string GetStrictReturnTypeName(ASMultiname propertyName)
+        {
+            switch (propertyName.Name)
+            {
+                case "int":
+                case "getTimer": return "int";
+            }
+            return null;
+        }
+        private bool TryGetTraitTypeName(ASContainer container, ASMultiname propertyName, out string propertyTypeName)
+        {
+            if (container == null)
+            {
+                propertyTypeName =
+                    GetStrictReturnTypeName(propertyName);
+            }
+            else
+            {
+                ASTrait propertyTrait = container.GetTraits(TraitKind.Slot, TraitKind.Constant, TraitKind.Getter)
+                    .Where(t => t.QName == propertyName)
+                    .FirstOrDefault();
+
+                propertyTypeName = propertyTrait?.Type.Name;
+            }
+            return (propertyTypeName != null);
         }
 
         private void Write(BinaryWriter output)
