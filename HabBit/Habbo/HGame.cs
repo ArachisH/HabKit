@@ -1060,6 +1060,7 @@ namespace HabBit.Habbo
             if (!IsOutgoing)
             {
                 Parser = GetMessageParser();
+                Structure = GetIncomingStructure(Parser);
             }
             else
             {
@@ -1121,6 +1122,141 @@ namespace HabBit.Habbo
                 }
             }
             return null;
+        }
+
+        private string[] GetIncomingStructure(ASClass @class)
+        {
+            ASMethod parseMethod = @class.Instance.GetMethod(1, "parse", "Boolean");
+            return GetIncomingStructure(@class.Instance, parseMethod);
+        }
+        private string[] GetIncomingStructure(ASInstance instance, ASMethod method)
+        {
+            if (method.Body.Exceptions.Count > 0) return null;
+
+            ASCode code = method.Body.ParseCode();
+            if (code.JumpExits.Count > 0 || code.SwitchExits.Count > 0) return null;
+
+            ABCFile abc = method.GetABC();
+            var structure = new List<string>();
+            for (int i = 0; i < code.Count; i++)
+            {
+                ASInstruction instruction = code[i];
+                if (instruction.OP != OPCode.GetLocal_1) continue;
+
+                ASInstruction next = code[++i];
+                switch (next.OP)
+                {
+                    case OPCode.CallProperty:
+                    {
+                        var callProperty = (CallPropertyIns)next;
+                        if (callProperty.ArgCount > 0)
+                        {
+                            ASMultiname propertyName = null;
+                            ASInstruction previous = code[i - 2];
+
+                            switch (previous.OP)
+                            {
+                                case OPCode.GetLex:
+                                {
+                                    var getLex = (GetLexIns)previous;
+                                    propertyName = getLex.TypeName;
+                                    break;
+                                }
+
+                                case OPCode.ConstructProp:
+                                {
+                                    var constructProp = (ConstructPropIns)previous;
+                                    propertyName = constructProp.PropertyName;
+                                    break;
+                                }
+
+                                case OPCode.GetLocal_0:
+                                {
+                                    propertyName = instance.QName;
+                                    break;
+                                }
+                            }
+
+                            ASInstance innerInstance = abc.GetFirstInstance(propertyName.Name);
+                            ASMethod innerMethod = innerInstance.GetMethod(callProperty.ArgCount, callProperty.PropertyName.Name);
+                            if (innerMethod == null)
+                            {
+                                ASClass innerClass = abc.GetFirstClass(propertyName.Name);
+                                innerMethod = innerClass.GetMethod(callProperty.ArgCount, callProperty.PropertyName.Name);
+                            }
+
+                            string[] innerStructure = GetIncomingStructure(innerInstance, innerMethod);
+                            if (innerStructure != null)
+                            {
+                                structure.AddRange(innerStructure);
+                            }
+                            else return null;
+                        }
+                        else
+                        {
+                            structure.Add(GetReadReturnTypeName(callProperty.PropertyName));
+                        }
+                        break;
+                    }
+
+                    case OPCode.ConstructProp:
+                    {
+                        var constructProp = (ConstructPropIns)next;
+                        ASInstance innerInstance = abc.GetFirstInstance(constructProp.PropertyName.Name);
+
+                        string[] innerStructure = GetIncomingStructure(innerInstance, innerInstance.Constructor);
+                        if (innerStructure != null)
+                        {
+                            structure.AddRange(innerStructure);
+                        }
+                        else return null;
+                        break;
+                    }
+
+                    case OPCode.ConstructSuper:
+                    {
+                        var constructSuper = (ConstructSuperIns)next;
+                        ASInstance superInstance = abc.GetFirstInstance(instance.Super.Name);
+
+                        string[] innerStructure = GetIncomingStructure(superInstance, superInstance.Constructor);
+                        if (innerStructure != null)
+                        {
+                            structure.AddRange(innerStructure);
+                        }
+                        else return null;
+                        break;
+                    }
+
+                    case OPCode.CallSuper:
+                    {
+                        var callSuper = (CallSuperIns)next;
+                        ASInstance superInstance = abc.GetFirstInstance(instance.Super.Name);
+
+                        ASMethod superMethod = superInstance.GetMethod(callSuper.ArgCount, callSuper.MethodName.Name);
+                        string[] innerStructure = GetIncomingStructure(superInstance, superMethod);
+                        if (innerStructure != null)
+                        {
+                            structure.AddRange(innerStructure);
+                        }
+                        else return null;
+                        break;
+                    }
+
+                    case OPCode.CallPropVoid:
+                    {
+                        var callPropVoid = (CallPropVoidIns)next;
+                        if (callPropVoid.ArgCount == 0)
+                        {
+                            structure.Add(GetReadReturnTypeName(callPropVoid.PropertyName));
+                        }
+                        else return null;
+                        break;
+                    }
+
+                    default: return null;
+                }
+            }
+            return structure.ToArray();
         }
 
         private string[] GetOutgoingStructure(ASClass @class)
@@ -1423,6 +1559,33 @@ namespace HabBit.Habbo
             return structure;
         }
 
+        private string GetReadReturnTypeName(ASMultiname propertyName)
+        {
+            switch (propertyName.Name)
+            {
+                case "readString":
+                return "String";
+
+                case "readBoolean":
+                return "Boolean";
+
+                case "readByte":
+                return "Byte";
+
+                case "readDouble":
+                return "Double";
+
+                default:
+                {
+                    if (!HGame.IsValidIdentifier(propertyName.Name, true))
+                    {
+                        // Most likely: readInt
+                        return "int";
+                    }
+                    return null;
+                }
+            }
+        }
         private string GetStrictReturnTypeName(ASMultiname propertyName)
         {
             switch (propertyName.Name)
