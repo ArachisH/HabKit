@@ -31,7 +31,8 @@ namespace HabBit.Habbo
             "implements", "import", "in", "package", "true",
             "try", "use", "var", "while", "with",
             "each", "null", "dynamic", "catch", "final",
-            "break", "set", "static", "super" };
+            "break", "set", "static", "super", "include",
+            "return", "native" };
 
         private readonly Dictionary<DoABCTag, ABCFile> _abcFileTags;
         private readonly Dictionary<ASClass, MessageItem> _messages;
