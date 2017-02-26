@@ -99,9 +99,14 @@ namespace HabBit.Utilities
         public bool IsReplacingRSAKeys { get; set; }
 
         /// <summary>
-        /// Gets or sets a value that determines whether the client will be forced to publicly share the DH(RC4 Stream Cypher Key) private key to any connected parties. 
+        /// Gets or sets the id of the message that will publicly share the DH(RC4 Stream Cypher Key) private key to any connected parties. 
         /// </summary>
-        public bool IsInjectingKeyShouter { get; set; }
+        public int KeyShouterId { get; set; } = -1;
+
+        /// <summary>
+        /// Gets or sets the port of the loopback endpoint to inject into the client.
+        /// </summary>
+        public int LoopbackPort { get; set; } = -1;
 
         /// <summary>
         /// Get or sets the name of the external function that will be called with the array of values being sent/received.
@@ -204,9 +209,15 @@ namespace HabBit.Utilities
                 }
                 #endregion
 
+                #region Argument: /ilep
+                case "/ilep":
+                LoopbackPort = int.Parse(values.Pop());
+                break;
+                #endregion
+
                 #region Argument: /kshout
                 case "/kshout":
-                IsInjectingKeyShouter = true;
+                KeyShouterId = int.Parse(values.Pop());
                 break;
                 #endregion
 
