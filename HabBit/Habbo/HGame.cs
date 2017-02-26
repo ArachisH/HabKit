@@ -32,12 +32,14 @@ namespace HabBit.Habbo
             "try", "use", "var", "while", "with",
             "each", "null", "dynamic", "catch", "final",
             "break", "set", "static", "super", "include",
-            "return", "native" };
+            "return", "native", "function", "throw" };
 
         private readonly Dictionary<DoABCTag, ABCFile> _abcFileTags;
         private readonly Dictionary<ASClass, MessageItem> _messages;
 
         public List<ABCFile> ABCFiles { get; }
+        public bool IsPostShuffle => (_messages.Count > 0);
+
         public SortedDictionary<ushort, MessageItem> InMessages { get; }
         public SortedDictionary<ushort, MessageItem> OutMessages { get; }
         public SortedDictionary<string, List<MessageItem>> Messages { get; }
@@ -465,84 +467,6 @@ namespace HabBit.Habbo
         }
         #endregion
 
-        public bool InjectKeyShouter()
-        {
-            ABCFile abc = ABCFiles[2];
-            int sendMessageQNameIndex = 0;
-
-            if (!DisableEncryption()) return false;
-            ASClass socketConnClass = abc.GetClasses("SocketConnection").FirstOrDefault();
-            if (socketConnClass == null) return false;
-            ASInstance socketConnInstance = socketConnClass.Instance;
-
-            ASMethod sendMethod = socketConnInstance.GetMethod(1, "send", "Boolean");
-            if (sendMethod == null) return false;
-
-            ASCode sendCode = sendMethod.Body.ParseCode();
-            SimplifySendCode(abc, sendCode);
-
-            #region Adding Method: sendMessage(header:int, ... values) : Boolean
-            // Create the method to house to body / instructions.
-            var sendMessageMethod = new ASMethod(abc);
-            sendMessageMethod.Flags |= MethodFlags.NeedRest;
-            sendMessageMethod.ReturnTypeIndex = sendMethod.ReturnTypeIndex;
-            int sendMessageMethodIndex = abc.AddMethod(sendMessageMethod);
-
-            // The parameters for the instructions to expect / use.
-            var headerParam = new ASParameter(abc, sendMessageMethod);
-            headerParam.NameIndex = abc.Pool.AddConstant("header");
-            headerParam.TypeIndex = abc.Pool.GetMultinameIndices("int").First();
-            sendMessageMethod.Parameters.Add(headerParam);
-
-            // The method body that houses the instructions.
-            var sendMessageBody = new ASMethodBody(abc);
-            sendMessageBody.MethodIndex = sendMessageMethodIndex;
-            sendMessageBody.Code = sendCode.ToArray();
-            sendMessageBody.InitialScopeDepth = 5;
-            sendMessageBody.MaxScopeDepth = 6;
-            sendMessageBody.LocalCount = 10;
-            sendMessageBody.MaxStack = 5;
-            abc.AddMethodBody(sendMessageBody);
-
-            socketConnInstance.AddMethod(sendMessageMethod, "sendMessage");
-            sendMessageQNameIndex = sendMessageMethod.Trait.QNameIndex;
-            #endregion
-
-            ASClass habboCommDemoClass = ABCFiles[2].GetClasses("HabboCommunicationDemo").FirstOrDefault();
-            if (habboCommDemoClass == null) return false;
-            ASInstance habboCommDemoInstance = habboCommDemoClass.Instance;
-
-            ASMethod pubKeyVerifyMethod = habboCommDemoInstance.GetMethods(1, "void")
-                .Where(m => m.Body.MaxStack == 4 &&
-                            m.Body.LocalCount == 10 &&
-                            m.Body.MaxScopeDepth == 6 &&
-                            m.Body.InitialScopeDepth == 5)
-                .FirstOrDefault();
-            if (pubKeyVerifyMethod == null) return false;
-
-            int coereceCount = 0;
-            ASCode pubKeyVerCode = pubKeyVerifyMethod.Body.ParseCode();
-            foreach (ASInstruction instruct in pubKeyVerCode)
-            {
-                if (instruct.OP == OPCode.Coerce &&
-                    (++coereceCount == 2))
-                {
-                    var coerceIns = (CoerceIns)instruct;
-                    coerceIns.TypeNameIndex = socketConnInstance.QNameIndex;
-                    break;
-                }
-            }
-            pubKeyVerCode.InsertRange(pubKeyVerCode.Count - 5, new ASInstruction[]
-            {
-                new GetLocal2Ins(),
-                new PushIntIns(abc, 4001),
-                new GetLocalIns(6),
-                new CallPropVoidIns(abc) { PropertyNameIndex = sendMessageQNameIndex, ArgCount = 2 }
-            });
-
-            pubKeyVerifyMethod.Body.Code = pubKeyVerCode.ToArray();
-            return true;
-        }
         public bool DisableHandshake()
         {
             if (!DisableEncryption()) return false;
@@ -622,6 +546,78 @@ namespace HabBit.Habbo
                 }
             }
             return DisableHostChanges();
+        }
+        public bool InjectKeyShouter(int id)
+        {
+            ABCFile abc = ABCFiles[2];
+            ASClass socketConnClass = abc.GetClasses("SocketConnection").FirstOrDefault();
+
+            if (socketConnClass == null) return false;
+            ASInstance socketConnInstance = socketConnClass.Instance;
+
+            ASTrait sendFunction = InjectUniversalSendFunction(true);
+            if (sendFunction == null) return false;
+
+            ASClass habboCommDemoClass = ABCFiles[2].GetClasses("HabboCommunicationDemo").FirstOrDefault();
+            if (habboCommDemoClass == null) return false;
+            ASInstance habboCommDemoInstance = habboCommDemoClass.Instance;
+
+            ASMethod pubKeyVerifyMethod = habboCommDemoInstance.GetMethods(1, "void")
+                .Where(m => m.Body.MaxStack == 4 &&
+                            m.Body.LocalCount == 10 &&
+                            m.Body.MaxScopeDepth == 6 &&
+                            m.Body.InitialScopeDepth == 5)
+                .FirstOrDefault();
+            if (pubKeyVerifyMethod == null) return false;
+
+            int coereceCount = 0;
+            ASCode pubKeyVerCode = pubKeyVerifyMethod.Body.ParseCode();
+            foreach (ASInstruction instruct in pubKeyVerCode)
+            {
+                if (instruct.OP == OPCode.Coerce &&
+                    (++coereceCount == 2))
+                {
+                    var coerceIns = (CoerceIns)instruct;
+                    coerceIns.TypeNameIndex = socketConnInstance.QNameIndex;
+                    break;
+                }
+            }
+            pubKeyVerCode.InsertRange(pubKeyVerCode.Count - 5, new ASInstruction[]
+            {
+                new GetLocal2Ins(),
+                new PushIntIns(abc, id),
+                new GetLocalIns(6),
+                new CallPropVoidIns(abc) { PropertyNameIndex = sendFunction.QNameIndex, ArgCount = 2 }
+            });
+
+            pubKeyVerifyMethod.Body.Code = pubKeyVerCode.ToArray();
+            return true;
+        }
+        public bool InjectLoopbackEndpoint(int port)
+        {
+            ABCFile abc = ABCFiles.Last();
+
+            ASInstance socketConnInstance = abc.GetFirstInstance("SocketConnection");
+            if (socketConnInstance == null) return false;
+
+            ASMethod initMethod = socketConnInstance.GetMethod(2, "init", "Boolean");
+            if (initMethod == null) return false;
+
+            ASCode code = initMethod.Body.ParseCode();
+            for (int i = 0; i < code.Count; i++)
+            {
+                ASInstruction instruction = code[i];
+                if (instruction.OP != OPCode.CallPropVoid) continue;
+
+                var callPropVoid = (CallPropVoidIns)instruction;
+                if (callPropVoid.PropertyName.Name != "connect") continue;
+
+                code[i - 2] = new PushStringIns(abc, "127.0.0.1");
+                code[i - 1] = new PushIntIns(abc, port);
+                break;
+            }
+            initMethod.Body.Code = code.ToArray();
+            return true;
         }
         public bool EnableDebugLogger(string functionName = null)
         {
@@ -795,8 +791,10 @@ namespace HabBit.Habbo
 
         private void LoadMessages()
         {
-            ABCFile abc = ABCFiles[2];
-            ASClass habboMessagesClass = abc.GetClasses("HabboMessages").First();
+            ABCFile abc = ABCFiles.Last();
+            ASClass habboMessagesClass = abc.GetClasses("HabboMessages").FirstOrDefault();
+            if (habboMessagesClass == null) return;
+
             ASCode code = habboMessagesClass.Constructor.Body.ParseCode();
 
             int inMapTypeIndex = habboMessagesClass.Traits[0].QNameIndex;
@@ -861,13 +859,13 @@ namespace HabBit.Habbo
                     }
                     sendCode[i] = replacement;
                 }
-                else
+                else if (isTrimming)
                 {
-                    if (instruction.OP != OPCode.DebugLine) continue;
-                    var debugIns = (DebugLineIns)instruction;
-                    if (debugIns.LineNumber != 247) continue;
+                    if (instruction.OP != OPCode.CallProperty) continue;
+                    var callProperty = (CallPropertyIns)instruction;
+                    if (callProperty.PropertyName.Name != "encode") continue;
 
-                    sendCode.RemoveRange(0, (i + 1));
+                    sendCode.RemoveRange(0, i - 4);
                     int headerNameIndex = abc.Pool.AddConstant("id");
                     int valuesNameIndex = abc.Pool.AddConstant("values");
                     sendCode.InsertRange(0, new ASInstruction[]
@@ -877,10 +875,53 @@ namespace HabBit.Habbo
                         new DebugIns(abc, headerNameIndex, 1, 0),
                         new DebugIns(abc, valuesNameIndex, 1, 1)
                     });
+
+                    i = 0;
                     isTrimming = false;
-                    i = 4;
                 }
             }
+        }
+        private ASTrait InjectUniversalSendFunction(bool disableCrypto)
+        {
+            ABCFile abc = ABCFiles[2];
+            if (disableCrypto && !DisableEncryption()) return null;
+
+            ASClass socketConnClass = abc.GetClasses("SocketConnection").FirstOrDefault();
+            if (socketConnClass == null) return null;
+            ASInstance socketConnInstance = socketConnClass.Instance;
+
+            ASMethod sendMethod = socketConnInstance.GetMethod(1, "send", "Boolean");
+            if (sendMethod == null) return null;
+
+            ASTrait sendFunctionTrait = socketConnInstance.GetMethod(1, "sendMessage", "Boolean")?.Trait;
+            if (sendFunctionTrait != null) return sendFunctionTrait;
+
+            ASCode sendCode = sendMethod.Body.ParseCode();
+            SimplifySendCode(abc, sendCode);
+
+            var sendMessageMethod = new ASMethod(abc);
+            sendMessageMethod.Flags |= MethodFlags.NeedRest;
+            sendMessageMethod.ReturnTypeIndex = sendMethod.ReturnTypeIndex;
+            int sendMessageMethodIndex = abc.AddMethod(sendMessageMethod);
+
+            // The parameters for the instructions to expect / use.
+            var headerParam = new ASParameter(abc, sendMessageMethod);
+            headerParam.NameIndex = abc.Pool.AddConstant("header");
+            headerParam.TypeIndex = abc.Pool.GetMultinameIndices("int").First();
+            sendMessageMethod.Parameters.Add(headerParam);
+
+            // The method body that houses the instructions.
+            var sendMessageBody = new ASMethodBody(abc);
+            sendMessageBody.MethodIndex = sendMessageMethodIndex;
+            sendMessageBody.Code = sendCode.ToArray();
+            sendMessageBody.InitialScopeDepth = 5;
+            sendMessageBody.MaxScopeDepth = 6;
+            sendMessageBody.LocalCount = 10;
+            sendMessageBody.MaxStack = 5;
+            abc.AddMethodBody(sendMessageBody);
+
+            socketConnInstance.AddMethod(sendMessageMethod, "sendMessage");
+            return sendMessageMethod.Trait;
         }
 
         private bool DisableEncryption()
@@ -895,35 +936,49 @@ namespace HabBit.Habbo
             ASCode sendCode = sendMethod.Body.ParseCode();
             sendCode.Deobfuscate();
 
-            ASInstruction[] writeInstructions = null;
-            for (int i = sendCode.Count - 1; i >= 0; i--)
+            ASTrait socketSlot = socketConnInstance.GetSlotTraits("Socket").FirstOrDefault();
+            if (socketSlot == null) return false;
+
+            int encodedLocal = -1;
+            for (int i = 0; i < sendCode.Count; i++)
             {
                 ASInstruction instruction = sendCode[i];
-                if (instruction.OP == OPCode.IfEq)
-                {
-                    writeInstructions = sendCode.GetJumpBlock((Jumper)instruction);
-                    foreach (ASInstruction blockInstruction in writeInstructions)
-                    {
-                        if (blockInstruction.OP != OPCode.GetLocal) continue;
-                        ((GetLocalIns)blockInstruction).Register--;
-                        break;
-                    }
-                    sendCode.RemoveRange(i -= 2, (writeInstructions.Length + 3));
-                }
-                else if (instruction.OP == OPCode.IfNe)
-                {
-                    int rc4NullCheckStart = (i - 3);
-                    sendCode.RemoveRange(rc4NullCheckStart, sendCode.Count - rc4NullCheckStart);
+                if (instruction.OP != OPCode.CallProperty) continue;
 
-                    sendCode.AddRange(writeInstructions
-                        .Concat(new ASInstruction[]
-                        {
-                            new PushTrueIns(),
-                            new ReturnValueIns()
-                        }));
-                    break;
-                }
+                var callProperty = (CallPropertyIns)instruction;
+                if (callProperty.PropertyName.Name != "encode") continue;
+
+                instruction = sendCode[i += 2];
+                if (!Local.IsSetLocal(instruction.OP)) continue;
+
+                encodedLocal = ((Local)instruction).Register;
+                sendCode.RemoveRange(i + 1, sendCode.Count - (i + 1));
+                break;
             }
+            if (encodedLocal == -1) return false;
+            ABCFile abc = socketConnInstance.GetABC();
+
+            int flushIndex = abc.Pool.GetMultinameIndices("flush").First();
+            if (flushIndex == 0) return false;
+
+            int writeBytesIndex = abc.Pool.GetMultinameIndices("writeBytes").First();
+            if (writeBytesIndex == 0) return false;
+
+            sendCode.AddRange(new ASInstruction[]
+            {
+                new GetLocal0Ins(),
+                new GetPropertyIns(abc) { PropertyNameIndex = socketSlot.QNameIndex },
+                new GetLocalIns(encodedLocal),
+                new CallPropVoidIns(abc) { PropertyNameIndex = writeBytesIndex, ArgCount = 1 },
+
+
+                new GetLocal0Ins(),
+                new GetPropertyIns(abc) { PropertyNameIndex = socketSlot.QNameIndex },
+                new CallPropVoidIns(abc) { PropertyNameIndex = flushIndex },
+
+                new PushTrueIns(),
+                new ReturnValueIns()
+            });
             sendMethod.Body.Code = sendCode.ToArray();
             return true;
         }
