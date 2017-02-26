@@ -36,9 +36,10 @@ namespace HabBit
             {
                 return (Options.IsSanitizing ||
                     Options.IsReplacingRSAKeys ||
+                    (Options.LoopbackPort > 0) ||
+                    (Options.KeyShouterId >= 0) ||
                     Options.IsDisablingHandshake ||
                     Options.IsDisablingHostChecks ||
-                    Options.IsInjectingKeyShouter ||
                     Options.IsEnablingDebugLogger ||
                     Options.IsInjectingMessageLogger ||
                     !string.IsNullOrWhiteSpace(Options.Revision));
@@ -159,10 +160,16 @@ namespace HabBit
                 ConsoleEx.WriteLineFinished();
             }
 
-            if (Options.IsInjectingKeyShouter)
+            if (Options.LoopbackPort > 0)
+            {
+                Console.Write("Injecting Loopback Endpoint...");
+                Game.InjectLoopbackEndpoint(Options.LoopbackPort).WriteLineResult();
+            }
+
+            if (Options.KeyShouterId >= 0)
             {
                 Console.Write("Injecting Key Shouter...");
-                Game.InjectKeyShouter().WriteLineResult();
+                Game.InjectKeyShouter(Options.KeyShouterId).WriteLineResult();
             }
             else if (Options.IsDisablingHandshake)
             {
@@ -304,11 +311,11 @@ namespace HabBit
             }
 
             var productInfo = (ProductInfoTag)Game.Tags
-                .First(t => t.Kind == TagKind.ProductInfo);
+                .FirstOrDefault(t => t.Kind == TagKind.ProductInfo);
 
             Console.WriteLine($"Outgoing Messages: {Game.OutMessages.Count:n0}");
             Console.WriteLine($"Incoming Messages: {Game.InMessages.Count:n0}");
-            Console.WriteLine("Compilation Date: {0}", productInfo.CompilationDate);
+            Console.WriteLine("Compilation Date: {0}", (productInfo?.CompilationDate.ToString() ?? "?"));
             Console.WriteLine("Revision: " + Game.Revision);
         }
 
