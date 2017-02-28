@@ -326,7 +326,7 @@ namespace HabBit
             string name = instance.QName.Name;
             string constructorSig = instance.Constructor.ToAS3(true);
 
-            output.Write($"[{message.Header}, {message.MD5}] = {name}{constructorSig}");
+            output.Write($"[{message.Id}, {message.MD5}] = {name}{constructorSig}");
             if (!message.IsOutgoing && message.Parser != null)
             {
                 output.Write($"[Parser: {message.Parser.Instance.QName.Name}]");
@@ -341,7 +341,7 @@ namespace HabBit
             {
                 if (message.References.Count == 0)
                 {
-                    deadMessages.Add(message.Header, message);
+                    deadMessages.Add(message.Id, message);
                     continue;
                 }
 
@@ -352,7 +352,7 @@ namespace HabBit
                     hashes = new SortedList<ushort, MessageItem>();
                     hashCollisions.Add(md5, hashes);
                 }
-                hashes.Add(message.Header, message);
+                hashes.Add(message.Id, message);
             }
 
             string[] keys = hashCollisions.Keys.ToArray();
@@ -459,7 +459,7 @@ namespace HabBit
                         else
                         {
                             MessageItem message = group[0];
-                            headerString = message.Header.ToString();
+                            headerString = message.Id.ToString();
 
                             totalMatches++;
                             suffix = (" // " + prevHeader);
