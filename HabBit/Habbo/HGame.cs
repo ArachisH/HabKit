@@ -38,7 +38,7 @@ namespace HabBit.Habbo
         private readonly Dictionary<ASClass, MessageItem> _messages;
 
         public List<ABCFile> ABCFiles { get; }
-        public bool IsPostShuffle => (_messages.Count > 0);
+        public bool IsPostShuffle { get; private set; } = true;
 
         public SortedDictionary<ushort, MessageItem> InMessages { get; }
         public SortedDictionary<ushort, MessageItem> OutMessages { get; }
@@ -347,8 +347,8 @@ namespace HabBit.Habbo
 
         public void GenerateMessageHashes()
         {
-            FindMessageReferences(ABCFiles[2]);
-            foreach (MessageItem message in _messages.Values)
+            FindMessageReferences(ABCFiles.Last());
+            foreach (MessageItem message in InMessages.Values.Concat(OutMessages.Values))
             {
                 message.GenerateHash();
                 List<MessageItem> group = null;
@@ -793,10 +793,19 @@ namespace HabBit.Habbo
         {
             ABCFile abc = ABCFiles.Last();
             ASClass habboMessagesClass = abc.GetClasses("HabboMessages").FirstOrDefault();
-            if (habboMessagesClass == null) return;
+            if (habboMessagesClass == null)
+            {
+                IsPostShuffle = false;
+                foreach (ASClass @class in abc.Classes)
+                {
+                    if (@class.Traits.Count != 2) continue;
+                    if (@class.Instance.Traits.Count != 3) continue;
+                    habboMessagesClass = @class;
+                    break;
+                }
+            }
 
             ASCode code = habboMessagesClass.Constructor.Body.ParseCode();
-
             int inMapTypeIndex = habboMessagesClass.Traits[0].QNameIndex;
             int outMapTypeIndex = habboMessagesClass.Traits[1].QNameIndex;
 
@@ -811,16 +820,21 @@ namespace HabBit.Habbo
                 bool isOutgoing = (getLexInst.TypeNameIndex == outMapTypeIndex);
 
                 var primitive = (instructions[i + 1] as Primitive);
-                ushort header = Convert.ToUInt16(primitive.Value);
+                ushort id = Convert.ToUInt16(primitive.Value);
 
                 getLexInst = (instructions[i + 2] as GetLexIns);
                 ASClass messageClass = abc.GetClasses(getLexInst.TypeName.Name).First();
 
-                var message = new MessageItem(messageClass, header, isOutgoing);
-                (isOutgoing ? OutMessages : InMessages).Add(header, message);
-                _messages.Add(messageClass, message);
+                var message = new MessageItem(messageClass, id, isOutgoing);
+                (isOutgoing ? OutMessages : InMessages).Add(id, message);
 
-                if (header == 4000 && isOutgoing)
+                if (_messages.ContainsKey(messageClass))
+                {
+                    _messages[messageClass].SharedIds.Add(id);
+                }
+                else _messages.Add(messageClass, message);
+
+                if (id == 4000 && isOutgoing)
                 {
                     ASInstance messageInstance = messageClass.Instance;
                     ASMethod toArrayMethod = messageInstance.GetMethods(0, "Array").First();
@@ -866,13 +880,13 @@ namespace HabBit.Habbo
                     if (callProperty.PropertyName.Name != "encode") continue;
 
                     sendCode.RemoveRange(0, i - 4);
-                    int headerNameIndex = abc.Pool.AddConstant("id");
+                    int idNameIndex = abc.Pool.AddConstant("id");
                     int valuesNameIndex = abc.Pool.AddConstant("values");
                     sendCode.InsertRange(0, new ASInstruction[]
                     {
                         new GetLocal0Ins(),
                         new PushScopeIns(),
-                        new DebugIns(abc, headerNameIndex, 1, 0),
+                        new DebugIns(abc, idNameIndex, 1, 0),
                         new DebugIns(abc, valuesNameIndex, 1, 1)
                     });
 
@@ -905,10 +919,10 @@ namespace HabBit.Habbo
             int sendMessageMethodIndex = abc.AddMethod(sendMessageMethod);
 
             // The parameters for the instructions to expect / use.
-            var headerParam = new ASParameter(abc, sendMessageMethod);
-            headerParam.NameIndex = abc.Pool.AddConstant("header");
-            headerParam.TypeIndex = abc.Pool.GetMultinameIndices("int").First();
-            sendMessageMethod.Parameters.Add(headerParam);
+            var idParam = new ASParameter(abc, sendMessageMethod);
+            idParam.NameIndex = abc.Pool.AddConstant("id");
+            idParam.TypeIndex = abc.Pool.GetMultinameIndices("int").First();
+            sendMessageMethod.Parameters.Add(idParam);
 
             // The method body that houses the instructions.
             var sendMessageBody = new ASMethodBody(abc);
@@ -1093,30 +1107,35 @@ namespace HabBit.Habbo
     }
     public class MessageItem
     {
-        public ushort Header { get; }
+        public ushort Id { get; }
         public bool IsOutgoing { get; }
         public string MD5 { get; private set; }
 
         public ASClass Class { get; }
         public ASClass Parser { get; }
         public string[] Structure { get; }
+        public List<ushort> SharedIds { get; }
         public List<MessageReference> References { get; }
 
         public MessageItem()
         {
+            SharedIds = new List<ushort>();
             References = new List<MessageReference>();
         }
-        public MessageItem(ASClass @class, ushort header, bool isOutgoing)
+        public MessageItem(ASClass @class, ushort id, bool isOutgoing)
             : this()
         {
-            Header = header;
+            Id = id;
             IsOutgoing = isOutgoing;
 
             Class = @class;
             if (!IsOutgoing)
             {
                 Parser = GetMessageParser();
-                Structure = GetIncomingStructure(Parser);
+                if (Parser != null)
+                {
+                    Structure = GetIncomingStructure(Parser);
+                }
             }
             else
             {
@@ -1144,7 +1163,9 @@ namespace HabBit.Habbo
             ABCFile abc = Class.GetABC();
             ASInstance instance = Class.Instance;
             ASInstance superInstance = abc.GetFirstInstance(instance.Super.Name);
-            ASMultiname parserType = superInstance.GetMethod(0, "parser").ReturnType;
+
+            ASMethod parserMethod = superInstance.GetMethod(0, "parser");
+            if (parserMethod == null) return null;
 
             IEnumerable<ASMethod> methods = instance.GetMethods()
                 .Concat(new[] { instance.Constructor });
@@ -1170,7 +1191,7 @@ namespace HabBit.Habbo
                     foreach (ASClass refClass in abc.GetClasses(multiname.Name))
                     {
                         ASInstance refInstance = refClass.Instance;
-                        if (refInstance.ContainsInterface(parserType.Name))
+                        if (refInstance.ContainsInterface(parserMethod.ReturnType.Name))
                         {
                             return refClass;
                         }
@@ -1700,7 +1721,7 @@ namespace HabBit.Habbo
                     }
                     WriteContainer(output, reference.FromClass.Instance, false);
                 }
-                if (!IsOutgoing)
+                if (!IsOutgoing && Parser != null)
                 {
                     WriteContainer(output, Parser.Instance);
                 }
