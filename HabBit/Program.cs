@@ -327,7 +327,7 @@ namespace HabBit
             string constructorSig = instance.Constructor.ToAS3(true);
 
             output.Write($"[{message.Header}, {message.MD5}] = {name}{constructorSig}");
-            if (!message.IsOutgoing)
+            if (!message.IsOutgoing && message.Parser != null)
             {
                 output.Write($"[Parser: {message.Parser.Instance.QName.Name}]");
             }
