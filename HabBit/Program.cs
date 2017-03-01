@@ -413,14 +413,19 @@ namespace HabBit
                 while (!fileOutput.EndOfStream)
                 {
                     string line = fileOutput.ReadLine();
-                    if (line.Contains("//"))
+
+                    int possibleCommentIndex = line.IndexOf("//");
+                    if (possibleCommentIndex != -1)
                     {
-                        line = Regex.Replace(line, "//(.*?)$", string.Empty);
+                        line = Regex.Replace(line, "([a-z]|[A-Z]|\\s)//(.*?)$", string.Empty, RegexOptions.RightToLeft);
                         if (string.IsNullOrWhiteSpace(line)) continue;
+                        if (possibleCommentIndex >= line.Length)
+                        {
+                            line = line.TrimEnd();
+                        }
                     }
 
-                    line = line.TrimEnd();
-                    Match declaration = Regex.Match(line, @"(?<start>(.*?))(?<header>[+-]?[0-9]\d*(\.\d+)?)\b(?<end>[^\r|$]*)");
+                    Match declaration = Regex.Match(line, @"^(?<start>(.*?))(?<id>\b[+-]?[0-9]\d*(\.\d+)?)(?<end>$)");
                     if (declaration.Success)
                     {
                         ushort prevHeader = 0;
@@ -430,7 +435,7 @@ namespace HabBit
 
                         string end = declaration.Groups["end"].Value;
                         string start = declaration.Groups["start"].Value;
-                        string headerString = declaration.Groups["header"].Value;
+                        string headerString = declaration.Groups["id"].Value;
 
                         totalValidAttempts++;
                         if (!ushort.TryParse(headerString, out prevHeader))
@@ -451,18 +456,24 @@ namespace HabBit
                         }
                         else if (group.Count > 1)
                         {
-                            // Too risky to set a header from one of the possible messages, set as invalid.
-                            // Maybe one day, we'll do a seperate type of scan for these, to check similarities.
                             headerString = "-1";
                             suffix = $" //! Duplicate Matches({prevHeader})";
+                            foreach (MessageItem similarMessage in group)
+                            {
+                                if (prevMessage.Class.QName.Name == similarMessage.Class.QName.Name)
+                                {
+                                    totalMatches++;
+                                    suffix = (" // " + prevHeader);
+                                    headerString = similarMessage.Id.ToString();
+                                    break;
+                                }
+                            }
                         }
                         else
                         {
-                            MessageItem message = group[0];
-                            headerString = message.Id.ToString();
-
                             totalMatches++;
                             suffix = (" // " + prevHeader);
+                            headerString = group[0].Id.ToString();
                         }
                         line = $"{start}{headerString}{end}{suffix}";
                     }
