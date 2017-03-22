@@ -5,11 +5,11 @@ using System.Runtime.InteropServices;
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
 [assembly: AssemblyTitle("HabBit")]
-[assembly: AssemblyDescription("Harble Client Modifier")]
+[assembly: AssemblyDescription("Habbo Client Modifier")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("")]
 [assembly: AssemblyProduct("HabBit")]
-[assembly: AssemblyCopyright("Copyright © HuitronAJ 2017")]
+[assembly: AssemblyCopyright("Copyright © ArachisH 2017")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 
@@ -19,7 +19,7 @@ using System.Runtime.InteropServices;
 [assembly: ComVisible(false)]
 
 // The following GUID is for the ID of the typelib if this project is exposed to COM
-[assembly: Guid("3d70079d-106d-43f6-9315-ee9899de2f4f")]
+[assembly: Guid("852be72e-0737-44a1-9061-f99c7942f1cb")]
 
 // Version information for an assembly consists of the following four values:
 //
