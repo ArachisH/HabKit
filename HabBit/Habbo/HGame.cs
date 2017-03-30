@@ -2,6 +2,7 @@
 using System.IO;
 using System.Linq;
 using System.Collections.Generic;
+using System.Security.Cryptography;
 
 using Flazzy;
 using Flazzy.IO;
@@ -31,12 +32,15 @@ namespace HabBit.Habbo
             "implements", "import", "in", "package", "true",
             "try", "use", "var", "while", "with",
             "each", "null", "dynamic", "catch", "final",
-            "break", "set", "static" };
+            "break", "set", "static", "super", "include",
+            "return", "native", "function", "throw", "switch" };
 
         private readonly Dictionary<DoABCTag, ABCFile> _abcFileTags;
         private readonly Dictionary<ASClass, MessageItem> _messages;
 
         public List<ABCFile> ABCFiles { get; }
+        public bool IsPostShuffle { get; private set; } = true;
+
         public SortedDictionary<ushort, MessageItem> InMessages { get; }
         public SortedDictionary<ushort, MessageItem> OutMessages { get; }
         public SortedDictionary<string, List<MessageItem>> Messages { get; }
@@ -48,7 +52,7 @@ namespace HabBit.Habbo
             {
                 if (ABCFiles.Count >= 3)
                 {
-                    return ABCFiles[2].Pool.Strings[_revisionIndex];
+                    return ABCFiles.Last().Pool.Strings[_revisionIndex];
                 }
                 else return "PRODUCTION-000000000000-000000000";
             }
@@ -56,7 +60,7 @@ namespace HabBit.Habbo
             {
                 if (ABCFiles.Count >= 3)
                 {
-                    ABCFiles[2].Pool.Strings[_revisionIndex] = value;
+                    ABCFiles.Last().Pool.Strings[_revisionIndex] = value;
                 }
             }
         }
@@ -101,7 +105,7 @@ namespace HabBit.Habbo
                 RenameIdentifiers();
             }
         }
-        #region Sanitization Methods
+        #region Method Body Sanitization
         protected void Deobfuscate()
         {
             foreach (ABCFile abc in ABCFiles)
@@ -153,8 +157,7 @@ namespace HabBit.Habbo
                         }
                         else name = $"local{(register - parameters.Count) + 1}";
 
-                        int nameIndex = 0;
-                        if (!nameIndices.TryGetValue(name, out nameIndex))
+                        if (!nameIndices.TryGetValue(name, out int nameIndex))
                         {
                             nameIndex = abc.Pool.AddConstant(name, false);
                             nameIndices.Add(name, nameIndex);
@@ -344,22 +347,23 @@ namespace HabBit.Habbo
 
         public void GenerateMessageHashes()
         {
-            FindMessageReferences(ABCFiles[2]);
-            foreach (MessageItem message in _messages.Values)
+            FindMessagesReferences();
+            foreach (MessageItem message in OutMessages.Values.Concat(InMessages.Values))
             {
                 message.GenerateHash();
-                List<MessageItem> group = null;
-                if (!Messages.TryGetValue(message.MD5, out group))
+                if (!Messages.TryGetValue(message.Hash, out List<MessageItem> group))
                 {
                     group = new List<MessageItem>();
-                    Messages.Add(message.MD5, group);
+                    Messages.Add(message.Hash, group);
                 }
                 group.Add(message);
             }
         }
-        #region Reference Scanning Methods
-        private void FindMessageReferences(ABCFile abc)
+        #region Message Reference Searching
+        private void FindMessagesReferences()
         {
+            int classRank = 1;
+            ABCFile abc = ABCFiles.Last();
             foreach (ASClass @class in abc.Classes)
             {
                 ASInstance instance = @class.Instance;
@@ -370,183 +374,147 @@ namespace HabBit.Habbo
                     .Concat(instance.GetMethods())
                     .Concat(@class.GetMethods());
 
-                int classReferenceRank = 0;
-                foreach (ASMethod method in methods)
+                int methodRank = 0;
+                foreach (ASMethod fromMethod in methods)
                 {
-                    bool isStatic = (method.Trait?.IsStatic ?? @class.Constructor == method);
-                    if (!FindMessageReferences(@class, method, isStatic, classReferenceRank)) continue;
-                    classReferenceRank++;
+                    bool isStatic = (fromMethod.Trait?.IsStatic ?? @class.Constructor == fromMethod);
+                    var fromContainer = (isStatic ? (ASContainer)@class : instance);
+
+                    List<MessageReference> refernces = FindMessageReferences(fromContainer, fromMethod);
+                    if (refernces.Count > 0)
+                    {
+                        methodRank++;
+                    }
+                    foreach (MessageReference reference in refernces)
+                    {
+                        reference.FromClass = @class;
+                        reference.IsStatic = isStatic;
+                        reference.ClassRank = classRank;
+                        reference.MethodRank = methodRank;
+                        reference.GroupCount = refernces.Count;
+                    }
+                }
+                if (methodRank > 0)
+                {
+                    classRank++;
+                }
+            }
+
+            var fromMethods = new List<ASMethod>();
+            foreach (MessageItem incomingMsg in InMessages.Values)
+            {
+                foreach (MessageReference reference in incomingMsg.References)
+                {
+                    if (!fromMethods.Contains(reference.FromMethod))
+                    {
+                        fromMethods.Add(reference.FromMethod);
+                    }
                 }
             }
         }
-        private bool FindMessageReferences(ASClass @class, ASMethod method, bool isStatic, int classReferenceRank)
+        private List<MessageReference> FindMessageReferences(ASContainer fromContainer, ASMethod fromMethod)
         {
-            int methodReferenceRank = 0;
-            bool foundReferences = false;
-            ABCFile abc = @class.GetABC();
-            ASCode code = method.Body.ParseCode();
-            var multinameStack = new Stack<ASMultiname>();
+            int instructionRank = 0;
+            ABCFile abc = fromMethod.GetABC();
+
+            var nameStack = new Stack<ASMultiname>();
+            var references = new List<MessageReference>();
+
+            ASContainer container = null;
+            ASCode code = fromMethod.Body.ParseCode();
             for (int i = 0; i < code.Count; i++)
             {
-                int argCount = 0;
-                string refernecedQName = null;
+                int extraNamePopCount = 0;
                 ASInstruction instruction = code[i];
                 switch (instruction.OP)
                 {
                     default: continue;
                     case OPCode.NewFunction:
                     {
-                        var newFunctionIns = (NewFunctionIns)instruction;
-                        foundReferences = FindMessageReferences(@class, newFunctionIns.Method, isStatic, classReferenceRank);
+                        var newFunction = (NewFunctionIns)instruction;
+                        references.AddRange(FindMessageReferences(fromContainer, newFunction.Method));
                         continue;
                     }
                     case OPCode.GetProperty:
                     {
-                        var getPropertyIns = (GetPropertyIns)instruction;
-                        multinameStack.Push(getPropertyIns.PropertyName);
-                        break;
+                        var getProperty = (GetPropertyIns)instruction;
+                        nameStack.Push(getProperty.PropertyName);
+                        continue;
                     }
                     case OPCode.GetLex:
                     {
-                        var getLexIns = (GetLexIns)instruction;
-                        if (code[i + 1].OP == OPCode.AsTypeLate)
-                        {
-                            refernecedQName = getLexIns.TypeName.Name;
-                        }
-                        break;
+                        var getLex = (GetLexIns)instruction;
+                        container = abc.GetFirstClass(getLex.TypeName.Name);
+                        continue;
                     }
-                    case OPCode.Coerce:
+                    case OPCode.GetLocal_0:
                     {
-                        var coerceIns = (CoerceIns)instruction;
-                        refernecedQName = coerceIns.TypeName.Name;
-                        break;
+                        container = fromContainer;
+                        continue;
                     }
                     case OPCode.ConstructProp:
                     {
-                        var constructPropIns = (ConstructPropIns)instruction;
+                        var constructProp = (ConstructPropIns)instruction;
 
-                        argCount = constructPropIns.ArgCount;
-                        refernecedQName = constructPropIns.PropertyName.Name;
+                        extraNamePopCount = constructProp.ArgCount;
+                        nameStack.Push(constructProp.PropertyName);
                         break;
                     }
                 }
 
-                if (string.IsNullOrWhiteSpace(refernecedQName)) continue;
-                ASClass messageClass = abc.GetClasses(refernecedQName).FirstOrDefault();
+                ASMultiname messageQName = nameStack.Pop();
+                if (string.IsNullOrWhiteSpace(messageQName.Name)) continue;
+
+                ASClass messageClass = abc.GetFirstClass(messageQName.Name);
                 if (messageClass == null) continue;
 
                 MessageItem message = null;
                 if (!_messages.TryGetValue(messageClass, out message)) continue;
+                if (message.HasMethodReference(fromMethod)) continue;
 
-                var reference = new MessageReference(@class);
-                reference.MethodReferenceRank = methodReferenceRank++;
-                reference.ClassReferenceRank = classReferenceRank;
-                reference.IsAnonymous = (method.Trait == null);
-                reference.FromMethod = method;
-                reference.ReferencedAt = i;
-
-                // Add the callback method to references.
-                if (!message.IsOutgoing && argCount > 0)
-                {
-                    ASMultiname callbackName = multinameStack.Pop();
-
-                    ASMethod callbackMethod = (isStatic ?
-                        @class.GetMethod(callbackName.Name) :
-                        @class.Instance.GetMethod(callbackName.Name));
-
-                    reference.InCallback = callbackMethod;
-                }
-
-                foundReferences = true;
+                var reference = new MessageReference();
                 message.References.Add(reference);
+
+                if (message.IsOutgoing)
+                {
+                    reference.FromMethod = fromMethod;
+                    reference.InstructionRank = ++instructionRank;
+                    reference.IsAnonymous = (!fromMethod.IsConstructor && fromMethod.Trait == null);
+
+                    references.Add(reference);
+                }
+                else
+                {
+                    ASMultiname methodName = nameStack.Pop();
+                    ASMethod callbackMethod = fromContainer.GetMethod(methodName.Name);
+                    if (callbackMethod == null)
+                    {
+                        callbackMethod = container.GetMethod(methodName.Name);
+                        if (callbackMethod == null)
+                        {
+                            ASMultiname slotName = nameStack.Pop();
+
+                            ASTrait hostTrait = container.GetTraits(TraitKind.Slot)
+                                .FirstOrDefault(st => st.QName == slotName);
+
+                            container = abc.GetFirstInstance(hostTrait.Type.Name);
+                            callbackMethod = container.GetMethod(methodName.Name);
+                        }
+                    }
+                    reference.FromMethod = callbackMethod;
+                }
             }
-            return foundReferences;
+            return references;
         }
         #endregion
 
-        public bool InjectKeyShouter()
-        {
-            ABCFile abc = ABCFiles[2];
-            int sendMessageQNameIndex = 0;
-
-            if (!DisableEncryption()) return false;
-            ASClass socketConnClass = abc.GetClasses("SocketConnection").FirstOrDefault();
-            if (socketConnClass == null) return false;
-            ASInstance socketConnInstance = socketConnClass.Instance;
-
-            ASMethod sendMethod = socketConnInstance.GetMethod(1, "send", "Boolean");
-            if (sendMethod == null) return false;
-
-            ASCode sendCode = sendMethod.Body.ParseCode();
-            SimplifySendCode(abc, sendCode);
-
-            #region Adding Method: sendMessage(header:int, ... values) : Boolean
-            // Create the method to house to body / instructions.
-            var sendMessageMethod = new ASMethod(abc);
-            sendMessageMethod.Flags |= MethodFlags.NeedRest;
-            sendMessageMethod.ReturnTypeIndex = sendMethod.ReturnTypeIndex;
-            int sendMessageMethodIndex = abc.AddMethod(sendMessageMethod);
-
-            // The parameters for the instructions to expect / use.
-            var headerParam = new ASParameter(abc, sendMessageMethod);
-            headerParam.NameIndex = abc.Pool.AddConstant("header");
-            headerParam.TypeIndex = abc.Pool.GetMultinameIndices("int").First();
-            sendMessageMethod.Parameters.Add(headerParam);
-
-            // The method body that houses the instructions.
-            var sendMessageBody = new ASMethodBody(abc);
-            sendMessageBody.MethodIndex = sendMessageMethodIndex;
-            sendMessageBody.Code = sendCode.ToArray();
-            sendMessageBody.InitialScopeDepth = 5;
-            sendMessageBody.MaxScopeDepth = 6;
-            sendMessageBody.LocalCount = 10;
-            sendMessageBody.MaxStack = 5;
-            abc.AddMethodBody(sendMessageBody);
-
-            socketConnInstance.AddMethod(sendMessageMethod, "sendMessage");
-            sendMessageQNameIndex = sendMessageMethod.Trait.QNameIndex;
-            #endregion
-
-            ASClass habboCommDemoClass = ABCFiles[2].GetClasses("HabboCommunicationDemo").FirstOrDefault();
-            if (habboCommDemoClass == null) return false;
-            ASInstance habboCommDemoInstance = habboCommDemoClass.Instance;
-
-            ASMethod pubKeyVerifyMethod = habboCommDemoInstance.GetMethods(1, "void")
-                .Where(m => m.Body.MaxStack == 4 &&
-                            m.Body.LocalCount == 10 &&
-                            m.Body.MaxScopeDepth == 6 &&
-                            m.Body.InitialScopeDepth == 5)
-                .FirstOrDefault();
-            if (pubKeyVerifyMethod == null) return false;
-
-            int coereceCount = 0;
-            ASCode pubKeyVerCode = pubKeyVerifyMethod.Body.ParseCode();
-            foreach (ASInstruction instruct in pubKeyVerCode)
-            {
-                if (instruct.OP == OPCode.Coerce &&
-                    (++coereceCount == 2))
-                {
-                    var coerceIns = (CoerceIns)instruct;
-                    coerceIns.TypeNameIndex = socketConnInstance.QNameIndex;
-                    break;
-                }
-            }
-            pubKeyVerCode.InsertRange(pubKeyVerCode.Count - 5, new ASInstruction[]
-            {
-                new GetLocal2Ins(),
-                new PushIntIns(abc, 4001),
-                new GetLocalIns(6),
-                new CallPropVoidIns(abc) { PropertyNameIndex = sendMessageQNameIndex, ArgCount = 2 }
-            });
-
-            pubKeyVerifyMethod.Body.Code = pubKeyVerCode.ToArray();
-            return true;
-        }
         public bool DisableHandshake()
         {
             if (!DisableEncryption()) return false;
 
-            ASClass habboCommDemoClass = ABCFiles[2].GetClasses("HabboCommunicationDemo").FirstOrDefault();
+            ABCFile abc = ABCFiles.Last();
+
+            ASClass habboCommDemoClass = abc.GetFirstClass("HabboCommunicationDemo");
             if (habboCommDemoClass == null) return false;
             ASInstance habboCommDemoInstance = habboCommDemoClass.Instance;
 
@@ -574,7 +542,7 @@ namespace HabBit.Habbo
                     {
                         new GetLocal0Ins(),
                         new GetLocal2Ins(),
-                        new CallPropVoidIns(ABCFiles[2])
+                        new CallPropVoidIns(abc)
                         {
                             ArgCount = 1,
                             PropertyNameIndex = method.Trait.QNameIndex
@@ -592,10 +560,12 @@ namespace HabBit.Habbo
                 .GetMethods(1, "Boolean").FirstOrDefault();
 
             if (localHostCheckMethod == null) return false;
-            var hostCheckMethods = new List<ASMethod>();
-            hostCheckMethods.Add(localHostCheckMethod);
+            var hostCheckMethods = new List<ASMethod>
+            {
+                localHostCheckMethod
+            };
 
-            ASClass habboClass = ABCFiles[1].GetClasses("Habbo").FirstOrDefault();
+            ASClass habboClass = ABCFiles[1].GetFirstClass("Habbo");
             if (habboClass == null) return false;
             ASInstance habboInstance = habboClass.Instance;
 
@@ -621,6 +591,78 @@ namespace HabBit.Habbo
                 }
             }
             return DisableHostChanges();
+        }
+        public bool InjectKeyShouter(int id)
+        {
+            ABCFile abc = ABCFiles.Last();
+            ASClass socketConnClass = abc.GetFirstClass("SocketConnection");
+
+            if (socketConnClass == null) return false;
+            ASInstance socketConnInstance = socketConnClass.Instance;
+
+            ASTrait sendFunction = InjectUniversalSendFunction(true);
+            if (sendFunction == null) return false;
+
+            ASClass habboCommDemoClass = abc.GetFirstClass("HabboCommunicationDemo");
+            if (habboCommDemoClass == null) return false;
+            ASInstance habboCommDemoInstance = habboCommDemoClass.Instance;
+
+            ASMethod pubKeyVerifyMethod = habboCommDemoInstance.GetMethods(1, "void")
+                .Where(m => m.Body.MaxStack == 4 &&
+                            m.Body.LocalCount == 10 &&
+                            m.Body.MaxScopeDepth == 6 &&
+                            m.Body.InitialScopeDepth == 5)
+                .FirstOrDefault();
+            if (pubKeyVerifyMethod == null) return false;
+
+            int coereceCount = 0;
+            ASCode pubKeyVerCode = pubKeyVerifyMethod.Body.ParseCode();
+            foreach (ASInstruction instruct in pubKeyVerCode)
+            {
+                if (instruct.OP == OPCode.Coerce &&
+                    (++coereceCount == 2))
+                {
+                    var coerceIns = (CoerceIns)instruct;
+                    coerceIns.TypeNameIndex = socketConnInstance.QNameIndex;
+                    break;
+                }
+            }
+            pubKeyVerCode.InsertRange(pubKeyVerCode.Count - 5, new ASInstruction[]
+            {
+                new GetLocal2Ins(),
+                new PushIntIns(abc, id),
+                new GetLocalIns(6),
+                new CallPropVoidIns(abc) { PropertyNameIndex = sendFunction.QNameIndex, ArgCount = 2 }
+            });
+
+            pubKeyVerifyMethod.Body.Code = pubKeyVerCode.ToArray();
+            return true;
+        }
+        public bool InjectLoopbackEndpoint(int port)
+        {
+            ABCFile abc = ABCFiles.Last();
+
+            ASInstance socketConnInstance = abc.GetFirstInstance("SocketConnection");
+            if (socketConnInstance == null) return false;
+
+            ASMethod initMethod = socketConnInstance.GetMethod(2, "init", "Boolean");
+            if (initMethod == null) return false;
+
+            ASCode code = initMethod.Body.ParseCode();
+            for (int i = 0; i < code.Count; i++)
+            {
+                ASInstruction instruction = code[i];
+                if (instruction.OP != OPCode.CallPropVoid) continue;
+
+                var callPropVoid = (CallPropVoidIns)instruction;
+                if (callPropVoid.PropertyName.Name != "connect") continue;
+
+                code[i - 2] = new PushStringIns(abc, "127.0.0.1");
+                code[i - 1] = new PushIntIns(abc, port);
+                break;
+            }
+            initMethod.Body.Code = code.ToArray();
+            return true;
         }
         public bool EnableDebugLogger(string functionName = null)
         {
@@ -672,7 +714,7 @@ namespace HabBit.Habbo
         }
         public bool InjectMessageLogger(string functionName = null)
         {
-            ASClass coreClass = ABCFiles[1].GetClasses("Core").FirstOrDefault();
+            ASClass coreClass = ABCFiles[1].GetFirstClass("Core");
             if (coreClass == null) return false;
 
             ASMethod debugMethod = coreClass.GetMethod(1, "debug", "void");
@@ -701,7 +743,7 @@ namespace HabBit.Habbo
             }
             debugMethod.Body.Code = debugCode.ToArray();
 
-            ABCFile abc = ABCFiles[2];
+            ABCFile abc = ABCFiles.Last();
             int coreQNameIndex = abc.Pool.GetMultinameIndices("Core").FirstOrDefault();
             ASMultiname coreQName = abc.Pool.Multinames[coreQNameIndex];
 
@@ -748,8 +790,8 @@ namespace HabBit.Habbo
         }
         public bool ReplaceRSAKeys(string exponent, string modulus)
         {
-            ABCFile abc = ABCFiles[2];
-            ASClass keyObfuscatorClass = abc.GetClasses("KeyObfuscator").FirstOrDefault();
+            ABCFile abc = ABCFiles.Last();
+            ASClass keyObfuscatorClass = abc.GetFirstClass("KeyObfuscator");
             if (keyObfuscatorClass == null) return false;
 
             int modifyCount = 0;
@@ -794,10 +836,21 @@ namespace HabBit.Habbo
 
         private void LoadMessages()
         {
-            ABCFile abc = ABCFiles[2];
-            ASClass habboMessagesClass = abc.GetClasses("HabboMessages").First();
-            ASCode code = habboMessagesClass.Constructor.Body.ParseCode();
+            ABCFile abc = ABCFiles.Last();
+            ASClass habboMessagesClass = abc.GetFirstClass("HabboMessages");
+            if (habboMessagesClass == null)
+            {
+                IsPostShuffle = false;
+                foreach (ASClass @class in abc.Classes)
+                {
+                    if (@class.Traits.Count != 2) continue;
+                    if (@class.Instance.Traits.Count != 3) continue;
+                    habboMessagesClass = @class;
+                    break;
+                }
+            }
 
+            ASCode code = habboMessagesClass.Constructor.Body.ParseCode();
             int inMapTypeIndex = habboMessagesClass.Traits[0].QNameIndex;
             int outMapTypeIndex = habboMessagesClass.Traits[1].QNameIndex;
 
@@ -812,16 +865,21 @@ namespace HabBit.Habbo
                 bool isOutgoing = (getLexInst.TypeNameIndex == outMapTypeIndex);
 
                 var primitive = (instructions[i + 1] as Primitive);
-                ushort header = Convert.ToUInt16(primitive.Value);
+                ushort id = Convert.ToUInt16(primitive.Value);
 
                 getLexInst = (instructions[i + 2] as GetLexIns);
-                ASClass messageClass = abc.GetClasses(getLexInst.TypeName.Name).First();
+                ASClass messageClass = abc.GetFirstClass(getLexInst.TypeName.Name);
 
-                var message = new MessageItem(messageClass, header, isOutgoing);
-                (isOutgoing ? OutMessages : InMessages).Add(header, message);
-                _messages.Add(messageClass, message);
+                var message = new MessageItem(messageClass, isOutgoing, id);
+                (isOutgoing ? OutMessages : InMessages).Add(id, message);
 
-                if (header == 4000 && isOutgoing)
+                if (_messages.ContainsKey(messageClass))
+                {
+                    _messages[messageClass].SharedIds.Add(id);
+                }
+                else _messages.Add(messageClass, message);
+
+                if (id == 4000 && isOutgoing)
                 {
                     ASInstance messageInstance = messageClass.Instance;
                     ASMethod toArrayMethod = messageInstance.GetMethods(0, "Array").First();
@@ -860,31 +918,74 @@ namespace HabBit.Habbo
                     }
                     sendCode[i] = replacement;
                 }
-                else
+                else if (isTrimming)
                 {
-                    if (instruction.OP != OPCode.DebugLine) continue;
-                    var debugIns = (DebugLineIns)instruction;
-                    if (debugIns.LineNumber != 247) continue;
+                    if (instruction.OP != OPCode.CallProperty) continue;
+                    var callProperty = (CallPropertyIns)instruction;
+                    if (callProperty.PropertyName.Name != "encode") continue;
 
-                    sendCode.RemoveRange(0, (i + 1));
-                    int headerNameIndex = abc.Pool.AddConstant("id");
+                    sendCode.RemoveRange(0, i - 4);
+                    int idNameIndex = abc.Pool.AddConstant("id");
                     int valuesNameIndex = abc.Pool.AddConstant("values");
                     sendCode.InsertRange(0, new ASInstruction[]
                     {
                         new GetLocal0Ins(),
                         new PushScopeIns(),
-                        new DebugIns(abc, headerNameIndex, 1, 0),
+                        new DebugIns(abc, idNameIndex, 1, 0),
                         new DebugIns(abc, valuesNameIndex, 1, 1)
                     });
+
+                    i = 0;
                     isTrimming = false;
-                    i = 4;
                 }
             }
+        }
+        private ASTrait InjectUniversalSendFunction(bool disableCrypto)
+        {
+            ABCFile abc = ABCFiles.Last();
+            if (disableCrypto && !DisableEncryption()) return null;
+
+            ASClass socketConnClass = abc.GetFirstClass("SocketConnection");
+            if (socketConnClass == null) return null;
+            ASInstance socketConnInstance = socketConnClass.Instance;
+
+            ASMethod sendMethod = socketConnInstance.GetMethod(1, "send", "Boolean");
+            if (sendMethod == null) return null;
+
+            ASTrait sendFunctionTrait = socketConnInstance.GetMethod(1, "sendMessage", "Boolean")?.Trait;
+            if (sendFunctionTrait != null) return sendFunctionTrait;
+
+            ASCode sendCode = sendMethod.Body.ParseCode();
+            SimplifySendCode(abc, sendCode);
+
+            var sendMessageMethod = new ASMethod(abc);
+            sendMessageMethod.Flags |= MethodFlags.NeedRest;
+            sendMessageMethod.ReturnTypeIndex = sendMethod.ReturnTypeIndex;
+            int sendMessageMethodIndex = abc.AddMethod(sendMessageMethod);
+
+            // The parameters for the instructions to expect / use.
+            var idParam = new ASParameter(abc, sendMessageMethod);
+            idParam.NameIndex = abc.Pool.AddConstant("id");
+            idParam.TypeIndex = abc.Pool.GetMultinameIndices("int").First();
+            sendMessageMethod.Parameters.Add(idParam);
+
+            // The method body that houses the instructions.
+            var sendMessageBody = new ASMethodBody(abc);
+            sendMessageBody.MethodIndex = sendMessageMethodIndex;
+            sendMessageBody.Code = sendCode.ToArray();
+            sendMessageBody.InitialScopeDepth = 5;
+            sendMessageBody.MaxScopeDepth = 6;
+            sendMessageBody.LocalCount = 10;
+            sendMessageBody.MaxStack = 5;
+            abc.AddMethodBody(sendMessageBody);
+
+            socketConnInstance.AddMethod(sendMessageMethod, "sendMessage");
+            return sendMessageMethod.Trait;
         }
 
         private bool DisableEncryption()
         {
-            ASClass socketConnClass = ABCFiles[2].GetClasses("SocketConnection").FirstOrDefault();
+            ASClass socketConnClass = ABCFiles.Last().GetFirstClass("SocketConnection");
             if (socketConnClass == null) return false;
             ASInstance socketConnInstance = socketConnClass.Instance;
 
@@ -894,43 +995,57 @@ namespace HabBit.Habbo
             ASCode sendCode = sendMethod.Body.ParseCode();
             sendCode.Deobfuscate();
 
-            ASInstruction[] writeInstructions = null;
-            for (int i = sendCode.Count - 1; i >= 0; i--)
+            ASTrait socketSlot = socketConnInstance.GetSlotTraits("Socket").FirstOrDefault();
+            if (socketSlot == null) return false;
+
+            int encodedLocal = -1;
+            for (int i = 0; i < sendCode.Count; i++)
             {
                 ASInstruction instruction = sendCode[i];
-                if (instruction.OP == OPCode.IfEq)
-                {
-                    writeInstructions = sendCode.GetJumpBlock((Jumper)instruction);
-                    foreach (ASInstruction blockInstruction in writeInstructions)
-                    {
-                        if (blockInstruction.OP != OPCode.GetLocal) continue;
-                        ((GetLocalIns)blockInstruction).Register--;
-                        break;
-                    }
-                    sendCode.RemoveRange(i -= 2, (writeInstructions.Length + 3));
-                }
-                else if (instruction.OP == OPCode.IfNe)
-                {
-                    int rc4NullCheckStart = (i - 3);
-                    sendCode.RemoveRange(rc4NullCheckStart, sendCode.Count - rc4NullCheckStart);
+                if (instruction.OP != OPCode.CallProperty) continue;
 
-                    sendCode.AddRange(writeInstructions
-                        .Concat(new ASInstruction[]
-                        {
-                            new PushTrueIns(),
-                            new ReturnValueIns()
-                        }));
-                    break;
-                }
+                var callProperty = (CallPropertyIns)instruction;
+                if (callProperty.PropertyName.Name != "encode") continue;
+
+                instruction = sendCode[i += 2];
+                if (!Local.IsSetLocal(instruction.OP)) continue;
+
+                encodedLocal = ((Local)instruction).Register;
+                sendCode.RemoveRange(i + 1, sendCode.Count - (i + 1));
+                break;
             }
+            if (encodedLocal == -1) return false;
+            ABCFile abc = socketConnInstance.GetABC();
+
+            int flushIndex = abc.Pool.GetMultinameIndices("flush").First();
+            if (flushIndex == 0) return false;
+
+            int writeBytesIndex = abc.Pool.GetMultinameIndices("writeBytes").First();
+            if (writeBytesIndex == 0) return false;
+
+            sendCode.AddRange(new ASInstruction[]
+            {
+                new GetLocal0Ins(),
+                new GetPropertyIns(abc) { PropertyNameIndex = socketSlot.QNameIndex },
+                new GetLocalIns(encodedLocal),
+                new CallPropVoidIns(abc) { PropertyNameIndex = writeBytesIndex, ArgCount = 1 },
+
+
+                new GetLocal0Ins(),
+                new GetPropertyIns(abc) { PropertyNameIndex = socketSlot.QNameIndex },
+                new CallPropVoidIns(abc) { PropertyNameIndex = flushIndex },
+
+                new PushTrueIns(),
+                new ReturnValueIns()
+            });
             sendMethod.Body.Code = sendCode.ToArray();
             return true;
         }
         private bool DisableHostChanges()
         {
-            ABCFile abc = ABCFiles[2];
+            ABCFile abc = ABCFiles.Last();
 
-            ASClass habboCommMngrClass = abc.GetClasses("HabboCommunicationManager").FirstOrDefault();
+            ASClass habboCommMngrClass = abc.GetFirstClass("HabboCommunicationManager");
             if (habboCommMngrClass == null) return false;
             ASInstance habboCommMngrInstance = habboCommMngrClass.Instance;
 
@@ -1037,29 +1152,35 @@ namespace HabBit.Habbo
     }
     public class MessageItem
     {
-        public ushort Header { get; }
-        public bool IsOutgoing { get; }
-        public string MD5 { get; private set; }
+        public ushort Id { get; set; }
+        public bool IsOutgoing { get; set; }
+        public string Hash { get; private set; }
 
         public ASClass Class { get; }
         public ASClass Parser { get; }
         public string[] Structure { get; }
+        public List<ushort> SharedIds { get; }
         public List<MessageReference> References { get; }
 
-        public MessageItem()
+        private MessageItem(bool isOutgoing, ushort id)
         {
-            References = new List<MessageReference>();
-        }
-        public MessageItem(ASClass @class, ushort header, bool isOutgoing)
-            : this()
-        {
-            Header = header;
+            Id = id;
             IsOutgoing = isOutgoing;
 
-            Class = @class;
+            SharedIds = new List<ushort>();
+            References = new List<MessageReference>();
+        }
+        public MessageItem(ASClass messageClass, bool isOutgoing, ushort id)
+            : this(isOutgoing, id)
+        {
+            Class = messageClass;
             if (!IsOutgoing)
             {
                 Parser = GetMessageParser();
+                if (Parser != null)
+                {
+                    Structure = GetIncomingStructure(Parser);
+                }
             }
             else
             {
@@ -1069,30 +1190,59 @@ namespace HabBit.Habbo
 
         public string GenerateHash()
         {
-            using (var md5 = System.Security.Cryptography.MD5.Create())
-            using (var outputMem = new MemoryStream())
-            using (var output = new BinaryWriter(outputMem))
+            using (var output = new MessageHasher(false))
             {
-                Write(output);
-                outputMem.Position = 0;
+                output.Write(IsOutgoing);
+                string name = Class.QName.Name;
+                if (!HGame.IsValidIdentifier(name, true))
+                {
+                    output.Write(References.Count);
+                    foreach (MessageReference reference in References)
+                    {
+                        output.Write(reference.IsStatic);
+                        output.Write(reference.GroupCount);
+                        if (reference.FromMethod != null)
+                        {
+                            output.Write(reference.FromMethod);
+                        }
+                        output.Write(reference.IsAnonymous);
 
-                MD5 = BitConverter.ToString(md5.ComputeHash(outputMem))
-                    .Replace("-", string.Empty).ToLower();
+                        output.Write(reference.ClassRank);
+                        output.Write(reference.MethodRank);
 
-                return MD5;
+                        if (IsOutgoing)
+                        {
+                            output.Write(reference.InstructionRank);
+                        }
+
+                        if (reference.FromClass != null)
+                        {
+                            output.Write(reference.FromClass, false);
+                        }
+                    }
+                }
+                else output.Write(name);
+                return (Hash = output.GetHash());
             }
         }
+        public bool HasMethodReference(ASMethod method)
+        {
+            return References.Any(r => r.FromMethod == method);
+        }
+
         private ASClass GetMessageParser()
         {
             ABCFile abc = Class.GetABC();
             ASInstance instance = Class.Instance;
+
             ASInstance superInstance = abc.GetFirstInstance(instance.Super.Name);
-            ASMultiname parserType = superInstance.GetMethod(0, "parser").ReturnType;
+            if (superInstance == null) superInstance = instance;
 
-            IEnumerable<ASMethod> methods = instance.GetMethods()
-                .Concat(new[] { instance.Constructor });
+            ASMethod parserGetterMethod = superInstance.GetGetter("parser")?.Method;
+            if (parserGetterMethod == null) return null;
 
-            foreach (ASMethod method in methods)
+            IEnumerable<ASMethod> methods = instance.GetMethods();
+            foreach (ASMethod method in methods.Concat(new[] { instance.Constructor }))
             {
                 ASCode code = method.Body.ParseCode();
                 foreach (ASInstruction instruction in code)
@@ -1113,7 +1263,7 @@ namespace HabBit.Habbo
                     foreach (ASClass refClass in abc.GetClasses(multiname.Name))
                     {
                         ASInstance refInstance = refClass.Instance;
-                        if (refInstance.ContainsInterface(parserType.Name))
+                        if (refInstance.ContainsInterface(parserGetterMethod.ReturnType.Name))
                         {
                             return refClass;
                         }
@@ -1121,6 +1271,142 @@ namespace HabBit.Habbo
                 }
             }
             return null;
+        }
+
+        #region Structure Extraction
+        private string[] GetIncomingStructure(ASClass @class)
+        {
+            ASMethod parseMethod = @class.Instance.GetMethod(1, "parse", "Boolean");
+            return GetIncomingStructure(@class.Instance, parseMethod);
+        }
+        private string[] GetIncomingStructure(ASInstance instance, ASMethod method)
+        {
+            if (method.Body.Exceptions.Count > 0) return null;
+
+            ASCode code = method.Body.ParseCode();
+            if (code.JumpExits.Count > 0 || code.SwitchExits.Count > 0) return null;
+
+            ABCFile abc = method.GetABC();
+            var structure = new List<string>();
+            for (int i = 0; i < code.Count; i++)
+            {
+                ASInstruction instruction = code[i];
+                if (instruction.OP != OPCode.GetLocal_1) continue;
+
+                ASInstruction next = code[++i];
+                switch (next.OP)
+                {
+                    case OPCode.CallProperty:
+                    {
+                        var callProperty = (CallPropertyIns)next;
+                        if (callProperty.ArgCount > 0)
+                        {
+                            ASMultiname propertyName = null;
+                            ASInstruction previous = code[i - 2];
+
+                            switch (previous.OP)
+                            {
+                                case OPCode.GetLex:
+                                {
+                                    var getLex = (GetLexIns)previous;
+                                    propertyName = getLex.TypeName;
+                                    break;
+                                }
+
+                                case OPCode.ConstructProp:
+                                {
+                                    var constructProp = (ConstructPropIns)previous;
+                                    propertyName = constructProp.PropertyName;
+                                    break;
+                                }
+
+                                case OPCode.GetLocal_0:
+                                {
+                                    propertyName = instance.QName;
+                                    break;
+                                }
+                            }
+
+                            ASInstance innerInstance = abc.GetFirstInstance(propertyName.Name);
+                            ASMethod innerMethod = innerInstance.GetMethod(callProperty.ArgCount, callProperty.PropertyName.Name);
+                            if (innerMethod == null)
+                            {
+                                ASClass innerClass = abc.GetFirstClass(propertyName.Name);
+                                innerMethod = innerClass.GetMethod(callProperty.ArgCount, callProperty.PropertyName.Name);
+                            }
+
+                            string[] innerStructure = GetIncomingStructure(innerInstance, innerMethod);
+                            if (innerStructure != null)
+                            {
+                                structure.AddRange(innerStructure);
+                            }
+                            else return null;
+                        }
+                        else
+                        {
+                            structure.Add(GetReadReturnTypeName(callProperty.PropertyName));
+                        }
+                        break;
+                    }
+
+                    case OPCode.ConstructProp:
+                    {
+                        var constructProp = (ConstructPropIns)next;
+                        ASInstance innerInstance = abc.GetFirstInstance(constructProp.PropertyName.Name);
+
+                        string[] innerStructure = GetIncomingStructure(innerInstance, innerInstance.Constructor);
+                        if (innerStructure != null)
+                        {
+                            structure.AddRange(innerStructure);
+                        }
+                        else return null;
+                        break;
+                    }
+
+                    case OPCode.ConstructSuper:
+                    {
+                        var constructSuper = (ConstructSuperIns)next;
+                        ASInstance superInstance = abc.GetFirstInstance(instance.Super.Name);
+
+                        string[] innerStructure = GetIncomingStructure(superInstance, superInstance.Constructor);
+                        if (innerStructure != null)
+                        {
+                            structure.AddRange(innerStructure);
+                        }
+                        else return null;
+                        break;
+                    }
+
+                    case OPCode.CallSuper:
+                    {
+                        var callSuper = (CallSuperIns)next;
+                        ASInstance superInstance = abc.GetFirstInstance(instance.Super.Name);
+
+                        ASMethod superMethod = superInstance.GetMethod(callSuper.ArgCount, callSuper.MethodName.Name);
+                        string[] innerStructure = GetIncomingStructure(superInstance, superMethod);
+                        if (innerStructure != null)
+                        {
+                            structure.AddRange(innerStructure);
+                        }
+                        else return null;
+                        break;
+                    }
+
+                    case OPCode.CallPropVoid:
+                    {
+                        var callPropVoid = (CallPropVoidIns)next;
+                        if (callPropVoid.ArgCount == 0)
+                        {
+                            structure.Add(GetReadReturnTypeName(callPropVoid.PropertyName));
+                        }
+                        else return null;
+                        break;
+                    }
+
+                    default: return null;
+                }
+            }
+            return structure.ToArray();
         }
 
         private string[] GetOutgoingStructure(ASClass @class)
@@ -1165,7 +1451,7 @@ namespace HabBit.Habbo
 
             if (argCount > 0)
             {
-                return GetOutgoingArrayStructure(getArrayCode, resultPusher, argCount);
+                return GetOutgoingStructure(getArrayCode, resultPusher, argCount);
             }
             else if (argCount == 0 ||
                 resultPusher.OP == OPCode.PushNull)
@@ -1176,15 +1462,15 @@ namespace HabBit.Habbo
             if (resultPusher.OP == OPCode.GetProperty)
             {
                 var getProperty = (GetPropertyIns)resultPusher;
-                return GetOutgoingConstructorStructure(Class, getProperty.PropertyName);
+                return GetOutgoingStructure(Class, getProperty.PropertyName);
             }
             else if (Local.IsGetLocal(resultPusher.OP))
             {
-                return GetOutgoingLocalStructure(getArrayCode, (Local)resultPusher);
+                return GetOutgoingStructure(getArrayCode, (Local)resultPusher);
             }
             return null;
         }
-        private string[] GetOutgoingLocalStructure(ASCode code, Local getLocal)
+        private string[] GetOutgoingStructure(ASCode code, Local getLocal)
         {
             var structure = new List<string>();
             for (int i = 0; i < code.Count; i++)
@@ -1218,8 +1504,7 @@ namespace HabBit.Habbo
                             classToCheck = classToCheck.GetABC().GetFirstClass(getLex.TypeName.Name);
                         }
 
-                        string propertyTypeName = null;
-                        if (TryGetTraitTypeName(classToCheck, propertyName, out propertyTypeName) ||
+                        if (TryGetTraitTypeName(classToCheck, propertyName, out string propertyTypeName) ||
                             TryGetTraitTypeName(classToCheck.Instance, propertyName, out propertyTypeName))
                         {
                             structure.Add(propertyTypeName);
@@ -1229,7 +1514,7 @@ namespace HabBit.Habbo
             }
             return structure.ToArray();
         }
-        private string[] GetOutgoingConstructorStructure(ASClass @class, ASMultiname propertyName)
+        private string[] GetOutgoingStructure(ASClass @class, ASMultiname propertyName)
         {
             ASMethod constructor = @class.Instance.Constructor;
             if (constructor.Body.Exceptions.Count > 0) return null;
@@ -1277,7 +1562,7 @@ namespace HabBit.Habbo
                     if (constructSuper.ArgCount > 0)
                     {
                         ASClass superClass = @class.GetABC().GetFirstClass(@class.Instance.Super.Name);
-                        structure.AddRange(GetOutgoingConstructorStructure(superClass, propertyName));
+                        structure.AddRange(GetOutgoingStructure(superClass, propertyName));
                     }
                 }
                 if (instruction.OP != OPCode.GetProperty) continue;
@@ -1327,8 +1612,7 @@ namespace HabBit.Habbo
                     }
                     while (next.OP != OPCode.GetProperty && next.OP != OPCode.CallProperty);
 
-                    string propertyTypeName = null;
-                    if (TryGetTraitTypeName(classToCheck, propertyName, out propertyTypeName) ||
+                    if (TryGetTraitTypeName(classToCheck, propertyName, out string propertyTypeName) ||
                         TryGetTraitTypeName(classToCheck?.Instance, propertyName, out propertyTypeName))
                     {
                         structure.Add(propertyTypeName);
@@ -1342,7 +1626,7 @@ namespace HabBit.Habbo
             }
             return structure.ToArray();
         }
-        private string[] GetOutgoingArrayStructure(ASCode code, ASInstruction beforeReturn, int length)
+        private string[] GetOutgoingStructure(ASCode code, ASInstruction beforeReturn, int length)
         {
             var getLocalEndIndex = -1;
             int pushingEndIndex = code.IndexOf(beforeReturn);
@@ -1366,8 +1650,7 @@ namespace HabBit.Habbo
                         classToCheck = classToCheck.GetABC().GetFirstClass(getLex.TypeName.Name);
                     }
 
-                    string propertyTypeName = null;
-                    if (TryGetTraitTypeName(classToCheck, propertyName, out propertyTypeName) ||
+                    if (TryGetTraitTypeName(classToCheck, propertyName, out string propertyTypeName) ||
                         TryGetTraitTypeName(classToCheck.Instance, propertyName, out propertyTypeName))
                     {
                         structure[--length] = propertyTypeName;
@@ -1390,9 +1673,8 @@ namespace HabBit.Habbo
                 ASInstruction instruction = code[i];
                 if (!Local.IsSetLocal(instruction.OP)) continue;
 
-                int structIndex = 0;
                 var local = (Local)instruction;
-                if (pushedLocals.TryGetValue(local.Register, out structIndex))
+                if (pushedLocals.TryGetValue(local.Register, out int structIndex))
                 {
                     ASInstruction beforeSet = code[i - 1];
                     pushedLocals.Remove(local.Register);
@@ -1423,6 +1705,33 @@ namespace HabBit.Habbo
             return structure;
         }
 
+        private string GetReadReturnTypeName(ASMultiname propertyName)
+        {
+            switch (propertyName.Name)
+            {
+                case "readString":
+                return "String";
+
+                case "readBoolean":
+                return "Boolean";
+
+                case "readByte":
+                return "Byte";
+
+                case "readDouble":
+                return "Double";
+
+                default:
+                {
+                    if (!HGame.IsValidIdentifier(propertyName.Name, true))
+                    {
+                        // Most likely: readInt
+                        return "int";
+                    }
+                    return null;
+                }
+            }
+        }
         private string GetStrictReturnTypeName(ASMultiname propertyName)
         {
             switch (propertyName.Name)
@@ -1441,7 +1750,8 @@ namespace HabBit.Habbo
             }
             else
             {
-                ASTrait propertyTrait = container.GetTraits(TraitKind.Slot, TraitKind.Constant, TraitKind.Getter)
+                ASTrait propertyTrait = container.GetTraits(
+                    TraitKind.Slot, TraitKind.Constant, TraitKind.Getter)
                     .Where(t => t.QName == propertyName)
                     .FirstOrDefault();
 
@@ -1449,63 +1759,61 @@ namespace HabBit.Habbo
             }
             return (propertyTypeName != null);
         }
+        #endregion
+    }
+    public class MessageHasher : BinaryWriter
+    {
+        public bool IsSorting { get; set; }
 
-        private void Write(BinaryWriter output)
+        private readonly SortedDictionary<int, int> _ints;
+        private readonly SortedDictionary<bool, int> _bools;
+        private readonly SortedDictionary<byte, int> _bytes;
+        private readonly SortedDictionary<string, int> _strings;
+
+        public MessageHasher(bool isSorting)
+            : base(new MemoryStream())
         {
-            output.Write(IsOutgoing);
-            string name = Class.Instance.QName.Name;
-            if (!HGame.IsValidIdentifier(name, true))
-            {
-                WriteMethod(output, Class.Constructor);
-                WriteMethod(output, Class.Instance.Constructor);
+            _ints = new SortedDictionary<int, int>();
+            _bools = new SortedDictionary<bool, int>();
+            _bytes = new SortedDictionary<byte, int>();
+            _strings = new SortedDictionary<string, int>();
 
-                WriteContainer(output, Class);
-                WriteContainer(output, Class.Instance);
-
-                output.Write(References.Count);
-                foreach (MessageReference reference in References)
-                {
-                    output.Write(reference.IsAnonymous);
-                    output.Write(reference.ClassReferenceRank);
-                    if (IsOutgoing || reference.InCallback == null)
-                    {
-                        output.Write(reference.MethodReferenceRank);
-                    }
-                    if (reference.InCallback != null)
-                    {
-                        WriteMethod(output, reference.InCallback);
-                    }
-                    else
-                    {
-                        WriteMethod(output, reference.FromMethod);
-                    }
-                    WriteContainer(output, reference.FromClass.Instance, false);
-                }
-                if (!IsOutgoing)
-                {
-                    WriteContainer(output, Parser.Instance);
-                }
-            }
-            else output.Write(name);
+            IsSorting = isSorting;
         }
-        private void WriteTrait(BinaryWriter output, ASTrait trait)
-        {
-            output.Write(trait.Id);
-            output.Write(trait.IsStatic);
-            WriteMultiname(output, trait.QName);
-            output.Write((byte)trait.Attributes);
 
-            output.Write((byte)trait.Kind);
+        public override void Write(int value)
+        {
+            WriteOrSort(_ints, base.Write, value);
+        }
+        public override void Write(bool value)
+        {
+            WriteOrSort(_bools, base.Write, value);
+        }
+        public override void Write(byte value)
+        {
+            WriteOrSort(_bytes, base.Write, value);
+        }
+        public override void Write(string value)
+        {
+            WriteOrSort(_strings, base.Write, value);
+        }
+
+        public void Write(ASTrait trait)
+        {
+            Write(trait.Id);
+            Write(trait.QName);
+            Write(trait.IsStatic);
+            Write((byte)trait.Kind);
+            Write((byte)trait.Attributes);
             switch (trait.Kind)
             {
                 case TraitKind.Slot:
                 case TraitKind.Constant:
                 {
-                    WriteMultiname(output, trait.Type);
+                    Write(trait.Type);
                     if (trait.Value != null)
                     {
-                        output.Write((byte)trait.ValueKind);
-                        WriteValue(output, trait.Value, trait.ValueKind);
+                        Write(trait.ValueKind, trait.Value);
                     }
                     break;
                 }
@@ -1513,145 +1821,166 @@ namespace HabBit.Habbo
                 case TraitKind.Getter:
                 case TraitKind.Setter:
                 {
-                    WriteMethod(output, trait.Method);
+                    Write(trait.Method);
                     break;
                 }
             }
         }
-        private void WriteMethod(BinaryWriter output, ASMethod method)
+        public void Write(ASMethod method)
         {
-            output.Write(method.IsConstructor);
+            Write(method.IsConstructor);
             if (!method.IsConstructor)
             {
-                WriteMultiname(output, method.ReturnType);
+                Write(method.ReturnType);
+                if (method.Trait != null)
+                {
+                    Write(method.Trait.QName);
+                }
             }
 
-            output.Write(method.Parameters.Count);
+            Write(method.Parameters.Count);
             foreach (ASParameter parameter in method.Parameters)
             {
-                WriteMultiname(output, parameter.Type);
+                Write(parameter.Type);
                 if (!string.IsNullOrWhiteSpace(parameter.Name) &&
                     HGame.IsValidIdentifier(parameter.Name, true))
                 {
-                    output.Write(parameter.Name);
+                    Write(parameter.Name);
                 }
 
-                output.Write(parameter.IsOptional);
+                Write(parameter.IsOptional);
                 if (parameter.IsOptional)
                 {
-                    output.Write((byte)parameter.ValueKind);
-                    WriteValue(output, parameter.Value, parameter.ValueKind);
+                    Write((byte)parameter.ValueKind);
+                    Write(parameter.ValueKind, parameter.Value);
                 }
             }
 
             ASCode code = method.Body.ParseCode();
-            foreach (OPCode op in code.GetOPGroups().Keys)
+            foreach (KeyValuePair<OPCode, List<ASInstruction>> group in code.GetOPGroups())
             {
-                if (op == OPCode.Dup) continue;
-                if (op == OPCode.Pop) continue;
-                if (op == OPCode.PushFalse) continue;
-                if (op == OPCode.PushTrue) continue;
-                if (op == OPCode.IfFalse) continue;
-                if (op == OPCode.IfTrue) continue;
-                output.Write((byte)op);
+                Write((byte)group.Key);
+                Write(group.Value.Count);
             }
         }
-        private void WriteMultiname(BinaryWriter output, ASMultiname multiname)
+        public void Write(ASMultiname multiname)
         {
             if (multiname?.Kind == MultinameKind.TypeName)
             {
-                WriteMultiname(output, multiname.QName);
-                output.Write(multiname.TypeIndices.Count);
+                Write(multiname.QName);
+                Write(multiname.TypeIndices.Count);
                 foreach (ASMultiname type in multiname.GetTypes())
                 {
-                    WriteMultiname(output, type);
+                    Write(type);
                 }
             }
             else if (multiname == null ||
                 HGame.IsValidIdentifier(multiname.Name, true))
             {
-                output.Write((multiname?.Name ?? "*"));
+                Write(multiname?.Name ?? "*");
             }
         }
-        private void WriteValue(BinaryWriter output, object value, ConstantKind kind)
+        public void Write(ConstantKind kind, object value)
         {
+            Write((byte)kind);
             switch (kind)
             {
                 case ConstantKind.Double:
-                output.Write((double)value);
+                Write((double)value);
                 break;
 
                 case ConstantKind.Integer:
-                output.Write((int)value);
+                Write((int)value);
                 break;
 
                 case ConstantKind.UInteger:
-                output.Write((uint)value);
+                Write((uint)value);
                 break;
 
                 case ConstantKind.String:
-                output.Write((string)value);
+                Write((string)value);
                 break;
 
                 case ConstantKind.Null:
-                output.Write("null");
+                Write("null");
                 break;
 
                 case ConstantKind.True:
-                output.Write(true);
+                Write(true);
                 break;
 
                 case ConstantKind.False:
-                output.Write(false);
+                Write(false);
                 break;
             }
         }
-        private void WriteContainer(BinaryWriter output, ASContainer container, bool includeTraits = true)
+        public void Write(ASContainer container, bool includeTraits)
         {
-            output.Write(container.IsStatic);
+            Write(container.QName);
+            Write(container.IsStatic);
             if (includeTraits)
             {
-                output.Write(container.Traits.Count);
-                container.Traits.ForEach(t => WriteTrait(output, t));
+                Write(container.Traits.Count);
+                container.Traits.ForEach(t => Write(t));
             }
+        }
+
+        public string GetHash()
+        {
+            Flush();
+            using (var md5 = MD5.Create())
+            {
+                long curPos = BaseStream.Position;
+                BaseStream.Position = 0;
+
+                byte[] hashData = md5.ComputeHash(BaseStream);
+                string hashAsHex = (BitConverter.ToString(hashData));
+
+                BaseStream.Position = curPos;
+                return hashAsHex.Replace("-", string.Empty).ToLower();
+            }
+        }
+        public override void Flush()
+        {
+            WriteSorted(_ints, base.Write);
+            WriteSorted(_bools, base.Write);
+            WriteSorted(_bytes, base.Write);
+            WriteSorted(_strings, base.Write);
+        }
+
+        private void WriteSorted<T>(IDictionary<T, int> storage, Action<T> writer)
+        {
+            foreach (KeyValuePair<T, int> storedPair in storage)
+            {
+                writer(storedPair.Key);
+                base.Write(storedPair.Value);
+            }
+        }
+        private void WriteOrSort<T>(IDictionary<T, int> storage, Action<T> writer, T value)
+        {
+            if (IsSorting)
+            {
+                if (storage.ContainsKey(value))
+                {
+                    storage[value]++;
+                }
+                else storage.Add(value, 1);
+            }
+            else writer(value);
         }
     }
     public class MessageReference
     {
-        /// <summary>
-        /// Gets the class that contains a method/instruction referencing the message.
-        /// </summary>
-        public ASClass FromClass { get; }
-        /// <summary>
-        /// Gets or sets the method that contains the instruction referencing the message.
-        /// </summary>
-        public ASMethod FromMethod { get; set; }
-        /// <summary>
-        /// Gets or sets the method that is passed as a parameter to the Incoming message handler class.
-        /// </summary>
-        public ASMethod InCallback { get; set; }
-
-        /// <summary>
-        /// Gets or sets whether the method body is owned by an anonymous method.
-        /// </summary>
+        public bool IsStatic { get; set; }
         public bool IsAnonymous { get; set; }
-        /// <summary>
-        /// Gets or sets the index at which point the message is being referneced by an instruction.
-        /// </summary>
-        public int ReferencedAt { get; set; }
 
-        /// <summary>
-        /// Gets or sets the rank of the reference relative to where the method referencing the message is located.
-        /// </summary>
-        public int ClassReferenceRank { get; set; }
-        /// <summary>
-        /// Gets or sets the rank of the reference relative to the order in which the message was referenced by an instruction.
-        /// </summary>
-        public int MethodReferenceRank { get; set; }
+        public int GroupCount { get; set; }
 
-        public MessageReference(ASClass fromClass)
-        {
-            FromClass = fromClass;
-        }
+        public int ClassRank { get; set; }
+        public int MethodRank { get; set; }
+        public int InstructionRank { get; set; }
+
+        public ASClass FromClass { get; set; }
+        public ASMethod FromMethod { get; set; }
     }
 }

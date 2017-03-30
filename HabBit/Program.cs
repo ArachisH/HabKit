@@ -21,9 +21,6 @@ namespace HabBit
         private const string EXTERNAL_VARIABLES_URL =
             "https://www.habbo.com/gamedata/external_variables";
 
-        private const string FLASH_CLIENT_URL_FORMAT =
-            "http://habboo-a.akamaihd.net/gordon/{0}/Habbo.swf";
-
         private const string CHROME_USER_AGENT =
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/56.0.2924.87 Safari/537.36";
 
@@ -36,9 +33,10 @@ namespace HabBit
             {
                 return (Options.IsSanitizing ||
                     Options.IsReplacingRSAKeys ||
+                    (Options.LoopbackPort > 0) ||
+                    (Options.KeyShouterId >= 0) ||
                     Options.IsDisablingHandshake ||
                     Options.IsDisablingHostChecks ||
-                    Options.IsInjectingKeyShouter ||
                     Options.IsEnablingDebugLogger ||
                     Options.IsInjectingMessageLogger ||
                     !string.IsNullOrWhiteSpace(Options.Revision));
@@ -113,27 +111,37 @@ namespace HabBit
             }
             ConsoleEx.WriteLineTitle("Fetching Client");
 
+            var flashClientUrl = string.Empty;
             using (var client = new WebClient())
             {
                 client.Headers[HttpRequestHeader.UserAgent] = CHROME_USER_AGENT;
-                if (!isRevisionKnown)
+                using (var gameDataStream = new StreamReader(client.OpenRead(EXTERNAL_VARIABLES_URL)))
                 {
-                    using (var gameDataStream = new StreamReader(client.OpenRead(EXTERNAL_VARIABLES_URL)))
+                    while (!gameDataStream.EndOfStream)
                     {
-                        while (!gameDataStream.EndOfStream)
-                        {
-                            // Maybe we can use some of this other stuff later, ignore for now though.
-                            string line = gameDataStream.ReadLine();
-                            if (!line.StartsWith("flash.client.url")) continue;
+                        string line = gameDataStream.ReadLine();
+                        if (!line.StartsWith("flash.client.url")) continue;
 
-                            int revisionStart = (line.IndexOf("gordon/") + 7);
-                            Options.RemoteRevision = line.Substring(revisionStart, (line.Length - revisionStart) - 1);
-                            break;
+                        int urlStart = (line.IndexOf('=') + 1);
+                        flashClientUrl = ("http:" + line.Substring(urlStart) + "Habbo.swf");
+                        
+                        int revisionStart = (line.IndexOf("gordon/") + 7);
+                        string revision = line.Substring(revisionStart, (line.Length - revisionStart) - 1);
+
+                        if (!isRevisionKnown)
+                        {
+                            Options.RemoteRevision = revision;
                         }
+                        else
+                        {
+                            flashClientUrl = flashClientUrl.Replace(
+                                revision, Options.RemoteRevision);
+                        }
+                        break;
                     }
                 }
 
-                var remoteUri = new Uri(string.Format(FLASH_CLIENT_URL_FORMAT, Options.RemoteRevision));
+                var remoteUri = new Uri(flashClientUrl);
                 Options.ClientInfo = new FileInfo(Path.Combine(Options.OutputDirectory, remoteUri.LocalPath.Substring(8)));
                 Options.OutputDirectory = Directory.CreateDirectory(Options.ClientInfo.DirectoryName).FullName;
 
@@ -159,10 +167,16 @@ namespace HabBit
                 ConsoleEx.WriteLineFinished();
             }
 
-            if (Options.IsInjectingKeyShouter)
+            if (Options.LoopbackPort > 0)
+            {
+                Console.Write("Injecting Loopback Endpoint...");
+                Game.InjectLoopbackEndpoint(Options.LoopbackPort).WriteLineResult();
+            }
+
+            if (Options.KeyShouterId >= 0)
             {
                 Console.Write("Injecting Key Shouter...");
-                Game.InjectKeyShouter().WriteLineResult();
+                Game.InjectKeyShouter(Options.KeyShouterId).WriteLineResult();
             }
             else if (Options.IsDisablingHandshake)
             {
@@ -219,6 +233,27 @@ namespace HabBit
             Game.GenerateMessageHashes();
             ConsoleEx.WriteLineFinished();
 
+            if (Options.IsDumpingMessageData)
+            {
+                string msgsPath = Path.Combine(Options.OutputDirectory, "Messages.txt");
+                using (var msgsStream = File.Open(msgsPath, FileMode.Create))
+                using (var msgsOutput = new StreamWriter(msgsStream))
+                {
+                    msgsOutput.WriteLine("// " + Game.Revision);
+                    msgsOutput.WriteLine();
+
+                    msgsOutput.WriteLine("// Outgoing Messages | " + Game.OutMessages.Count.ToString("n0"));
+                    WriteMessages(msgsOutput, "Outgoing", Game.OutMessages);
+
+                    msgsOutput.WriteLine();
+
+                    msgsOutput.WriteLine("// Incoming Messages | " + Game.OutMessages.Count.ToString("n0"));
+                    WriteMessages(msgsOutput, "Incoming", Game.InMessages);
+
+                    Console.WriteLine("Messages Saved: " + msgsPath);
+                }
+            }
+
             if (Options.IsMatchingMessages)
             {
                 using (var compareGame = new HGame(Options.CompareInfo.FullName))
@@ -254,7 +289,6 @@ namespace HabBit
                 Console.WriteLine("File Assembled: " + asmdPath);
             }
 
-            #region Storing RSA Keys
             if (Options.IsReplacingRSAKeys)
             {
                 string keysPath = Path.Combine(Options.OutputDirectory, "RSAKeys.txt");
@@ -267,30 +301,6 @@ namespace HabBit
                     Console.WriteLine("RSA Keys Saved: " + keysPath);
                 }
             }
-            #endregion
-
-            #region Storing Message Data
-            if (Options.IsDumpingMessageData)
-            {
-                string msgsPath = Path.Combine(Options.OutputDirectory, "Messages.txt");
-                using (var msgsStream = File.Open(msgsPath, FileMode.Create))
-                using (var msgsOutput = new StreamWriter(msgsStream))
-                {
-                    msgsOutput.WriteLine("// " + Game.Revision);
-                    msgsOutput.WriteLine();
-
-                    msgsOutput.WriteLine("// Outgoing Messages | " + Game.OutMessages.Count.ToString("n0"));
-                    WriteMessages(msgsOutput, "Outgoing", Game.OutMessages);
-
-                    msgsOutput.WriteLine();
-
-                    msgsOutput.WriteLine("// Incoming Messages | " + Game.OutMessages.Count.ToString("n0"));
-                    WriteMessages(msgsOutput, "Incoming", Game.InMessages);
-
-                    Console.WriteLine("Messages Saved: " + msgsPath);
-                }
-            }
-            #endregion
         }
         private void Disassemble()
         {
@@ -304,11 +314,11 @@ namespace HabBit
             }
 
             var productInfo = (ProductInfoTag)Game.Tags
-                .First(t => t.Kind == TagKind.ProductInfo);
+                .FirstOrDefault(t => t.Kind == TagKind.ProductInfo);
 
             Console.WriteLine($"Outgoing Messages: {Game.OutMessages.Count:n0}");
             Console.WriteLine($"Incoming Messages: {Game.InMessages.Count:n0}");
-            Console.WriteLine("Compilation Date: {0}", productInfo.CompilationDate);
+            Console.WriteLine("Compilation Date: {0}", (productInfo?.CompilationDate.ToString() ?? "?"));
             Console.WriteLine("Revision: " + Game.Revision);
         }
 
@@ -319,8 +329,8 @@ namespace HabBit
             string name = instance.QName.Name;
             string constructorSig = instance.Constructor.ToAS3(true);
 
-            output.Write($"[{message.Header}, {message.MD5}] = {name}{constructorSig}");
-            if (!message.IsOutgoing)
+            output.Write($"[{message.Id}, {message.Hash}] = {name}{constructorSig}");
+            if (!message.IsOutgoing && message.Parser != null)
             {
                 output.Write($"[Parser: {message.Parser.Instance.QName.Name}]");
             }
@@ -334,18 +344,16 @@ namespace HabBit
             {
                 if (message.References.Count == 0)
                 {
-                    deadMessages.Add(message.Header, message);
+                    deadMessages.Add(message.Id, message);
                     continue;
                 }
-
-                string md5 = message.MD5;
-                SortedList<ushort, MessageItem> hashes = null;
-                if (!hashCollisions.TryGetValue(md5, out hashes))
+                
+                if (!hashCollisions.TryGetValue(message.Hash, out SortedList<ushort, MessageItem> hashes))
                 {
                     hashes = new SortedList<ushort, MessageItem>();
-                    hashCollisions.Add(md5, hashes);
+                    hashCollisions.Add(message.Hash, hashes);
                 }
-                hashes.Add(message.Header, message);
+                hashes.Add(message.Id, message);
             }
 
             string[] keys = hashCollisions.Keys.ToArray();
@@ -357,8 +365,7 @@ namespace HabBit
 
             foreach (MessageItem message in messages.Values)
             {
-                string md5 = message.MD5;
-                if (hashCollisions.ContainsKey(md5)) continue;
+                if (hashCollisions.ContainsKey(message.Hash)) continue;
                 if (message.References.Count == 0) continue;
 
                 output.Write(title);
@@ -406,27 +413,31 @@ namespace HabBit
                 while (!fileOutput.EndOfStream)
                 {
                     string line = fileOutput.ReadLine();
-                    if (line.Contains("//"))
+
+                    int possibleCommentIndex = line.IndexOf("//");
+                    if (possibleCommentIndex != -1)
                     {
-                        line = Regex.Replace(line, "//(.*?)$", string.Empty);
+                        line = Regex.Replace(line, "([a-z]|[A-Z]|\\s)//(.*?)$", string.Empty, RegexOptions.RightToLeft);
                         if (string.IsNullOrWhiteSpace(line)) continue;
+                        if (possibleCommentIndex >= line.Length)
+                        {
+                            line = line.TrimEnd();
+                        }
                     }
 
-                    line = line.TrimEnd();
-                    Match declaration = Regex.Match(line, @"(?<start>(.*?))(?<header>[+-]?[0-9]\d*(\.\d+)?)\b(?<end>[^\r|$]*)");
+                    Match declaration = Regex.Match(line, @"^(?<start>(.*?))(?<id>\b[+-]?[0-9]\d*(\.\d+)?)(?<end>$)");
                     if (declaration.Success)
                     {
-                        ushort prevHeader = 0;
                         var suffix = string.Empty;
                         MessageItem prevMessage = null;
                         List<MessageItem> group = null;
 
                         string end = declaration.Groups["end"].Value;
                         string start = declaration.Groups["start"].Value;
-                        string headerString = declaration.Groups["header"].Value;
+                        string headerString = declaration.Groups["id"].Value;
 
                         totalValidAttempts++;
-                        if (!ushort.TryParse(headerString, out prevHeader))
+                        if (!ushort.TryParse(headerString, out ushort prevHeader))
                         {
                             totalValidAttempts--;
                             suffix = " //! Invalid Header";
@@ -437,25 +448,31 @@ namespace HabBit
                             headerString = "-1";
                             suffix = $" //! Unknown Message({prevHeader})";
                         }
-                        else if (!Game.Messages.TryGetValue(prevMessage.MD5, out group))
+                        else if (!Game.Messages.TryGetValue(prevMessage.Hash, out group))
                         {
                             headerString = "-1";
                             suffix = $" //! Zero Matches({prevHeader})";
                         }
                         else if (group.Count > 1)
                         {
-                            // Too risky to set a header from one of the possible messages, set as invalid.
-                            // Maybe one day, we'll do a seperate type of scan for these, to check similarities.
                             headerString = "-1";
                             suffix = $" //! Duplicate Matches({prevHeader})";
+                            foreach (MessageItem similarMessage in group)
+                            {
+                                if (prevMessage.Class.QName.Name == similarMessage.Class.QName.Name)
+                                {
+                                    totalMatches++;
+                                    suffix = (" // " + prevHeader);
+                                    headerString = similarMessage.Id.ToString();
+                                    break;
+                                }
+                            }
                         }
                         else
                         {
-                            MessageItem message = group[0];
-                            headerString = message.Header.ToString();
-
                             totalMatches++;
                             suffix = (" // " + prevHeader);
+                            headerString = group[0].Id.ToString();
                         }
                         line = $"{start}{headerString}{end}{suffix}";
                     }
