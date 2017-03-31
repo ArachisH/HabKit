@@ -1,4 +1,6 @@
 # HabBit
+This repo has been moved to https://gitlab.com/Harble/HabBit, this version will no longer be maintained.
+--
 Command line tool for allowing the user to remove certain restrictions from the Harble client that do not originally allow it to be used locally.
 
 ## Requirements
