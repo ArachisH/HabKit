@@ -46,7 +46,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Submodules\Flazzy\Flazzy\Flazzy.csproj">
-      <Project>{41c5bb50-939e-4f53-9c24-203b180943ee}</Project>
+      <Project>{84d3802e-16aa-4dd1-906c-3d4aee5ff8c6}</Project>
       <Name>Flazzy</Name>
     </ProjectReference>
   </ItemGroup>
