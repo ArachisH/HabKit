@@ -8,7 +8,7 @@ Command line tool for allowing the user to remove certain restrictions from the 
 This section is for people who've never used a command line tool before, proceed to the next section for the list of [arguments](#arguments).
 
 Download, and extract the latest release somewhere accessible on your computer, excluding your recycle bin.
-You can find the latest release here: https://github.com/Kallot/HabBit/releases/latest
+You can find the latest release here: https://gitlab.com/Harble/HabBit/tags
 
 I'll assume you extracted it onto your desktop under a folder named **HabBit**, so with that, let's start up the command prompt.
 (Windows Key + R) This key combination will bring up some box, type **cmd** into the input box and hit the **OK**.
