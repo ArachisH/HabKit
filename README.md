@@ -13,7 +13,7 @@ You can find the latest release here: https://gitlab.com/ArachisH/HabBit/tags
 I'll assume you extracted it onto your desktop under a folder named **HabBit**, so with that, let's start up the command prompt.
 (Windows Key + R) This key combination will bring up some box, type **cmd** into the input box and hit the **OK**.
 
-Some black box should have appeared, the next step involves changing the current active directory that the console is pointing to. By default, it should be pointing to **C:\Users\{Username}**. We need to change the directory to points towards the folder to where HabBit has been extracted to, to do this use the **cd** command followed by the path. If you didn't extract it to a folder named HabBit onto your desktop, then your path should look different based on where it is.
+Some black box should have appeared, the next step involves changing the current active directory that the console is pointing to. By default, it should be pointing to **C:\Users\\{Username}**. We need to change the directory to points towards the folder to where HabBit has been extracted to, to do this use the **cd** command followed by the path. If you didn't extract it to a folder named HabBit onto your desktop, then your path should look different based on where it is.
 ```
 cd C:\Users\{Username}\Desktop\HabBit
 ```
