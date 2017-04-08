@@ -387,7 +387,6 @@ namespace HabBit.Habbo
                     }
                     foreach (MessageReference reference in refernces)
                     {
-                        reference.FromClass = @class;
                         reference.IsStatic = isStatic;
                         reference.ClassRank = classRank;
                         reference.MethodRank = methodRank;
@@ -400,15 +399,71 @@ namespace HabBit.Habbo
                 }
             }
 
-            var fromMethods = new List<ASMethod>();
+            var froms = new Dictionary<ASContainer, List<MessageReference>>();
             foreach (MessageItem incomingMsg in InMessages.Values)
             {
                 foreach (MessageReference reference in incomingMsg.References)
                 {
-                    if (!fromMethods.Contains(reference.FromMethod))
+                    List<MessageReference> references = null;
+                    if (!froms.TryGetValue(reference.FromMethod.Container, out references))
                     {
-                        fromMethods.Add(reference.FromMethod);
+                        references = new List<MessageReference>();
+                        references.Add(reference);
+
+                        froms.Add(reference.FromMethod.Container, references);
                     }
+                    else if (!references.Contains(reference))
+                    {
+                        references.Add(reference);
+                    }
+                }
+            }
+
+            classRank = 1;
+            foreach (ASClass @class in abc.Classes)
+            {
+                ASContainer container = null;
+                List<MessageReference> references = null;
+                if (froms.TryGetValue(@class, out references))
+                {
+                    container = @class;
+                }
+                else if (froms.TryGetValue(@class.Instance, out references))
+                {
+                    container = @class.Instance;
+                }
+                if (container != null)
+                {
+                    var methodReferenceGroups = new Dictionary<ASMethod, List<MessageReference>>();
+                    foreach (MessageReference reference in references)
+                    {
+                        reference.InstructionRank = -1;
+                        reference.ClassRank = classRank;
+                        reference.GroupCount = references.Count;
+
+                        List<MessageReference> methodReferences = null;
+                        if (!methodReferenceGroups.TryGetValue(reference.FromMethod, out methodReferences))
+                        {
+                            methodReferences = new List<MessageReference>();
+                            methodReferenceGroups.Add(reference.FromMethod, methodReferences);
+                        }
+                        methodReferences.Add(reference);
+                    }
+
+                    int methodRank = 1;
+                    foreach (ASMethod method in container.GetMethods())
+                    {
+                        List<MessageReference> methodReferences = null;
+                        if (methodReferenceGroups.TryGetValue(method, out methodReferences))
+                        {
+                            foreach (MessageReference reference in methodReferences)
+                            {
+                                reference.MethodRank = methodRank;
+                            }
+                            methodRank++;
+                        }
+                    }
+                    classRank++;
                 }
             }
         }
@@ -479,7 +534,6 @@ namespace HabBit.Habbo
                 {
                     reference.FromMethod = fromMethod;
                     reference.InstructionRank = ++instructionRank;
-                    reference.IsAnonymous = (!fromMethod.IsConstructor && fromMethod.Trait == null);
 
                     references.Add(reference);
                 }
@@ -502,6 +556,7 @@ namespace HabBit.Habbo
                         }
                     }
                     reference.FromMethod = callbackMethod;
+                    reference.IsStatic = callbackMethod.Container.IsStatic;
                 }
             }
             return references;
@@ -1150,11 +1205,12 @@ namespace HabBit.Habbo
                 !_reservedNames.Contains(value.Trim()));
         }
     }
+
     public class MessageItem
     {
         public ushort Id { get; set; }
+        public string Hash { get; set; }
         public bool IsOutgoing { get; set; }
-        public string Hash { get; private set; }
 
         public ASClass Class { get; }
         public ASClass Parser { get; }
@@ -1162,18 +1218,15 @@ namespace HabBit.Habbo
         public List<ushort> SharedIds { get; }
         public List<MessageReference> References { get; }
 
-        private MessageItem(bool isOutgoing, ushort id)
+        public MessageItem(ASClass messageClass, bool isOutgoing, ushort id)
         {
             Id = id;
+            Class = messageClass;
             IsOutgoing = isOutgoing;
 
             SharedIds = new List<ushort>();
             References = new List<MessageReference>();
-        }
-        public MessageItem(ASClass messageClass, bool isOutgoing, ushort id)
-            : this(isOutgoing, id)
-        {
-            Class = messageClass;
+
             if (!IsOutgoing)
             {
                 Parser = GetMessageParser();
@@ -1190,39 +1243,28 @@ namespace HabBit.Habbo
 
         public string GenerateHash()
         {
-            using (var output = new MessageHasher(false))
+            if (!string.IsNullOrWhiteSpace(Hash))
+            {
+                return Hash;
+            }
+            using (var output = new MessageHasher())
             {
                 output.Write(IsOutgoing);
-                string name = Class.QName.Name;
-                if (!HGame.IsValidIdentifier(name, true))
+                if (!HGame.IsValidIdentifier(Class.QName.Name, true))
                 {
                     output.Write(References.Count);
                     foreach (MessageReference reference in References)
                     {
-                        output.Write(reference.IsStatic);
-                        output.Write(reference.GroupCount);
-                        if (reference.FromMethod != null)
-                        {
-                            output.Write(reference.FromMethod);
-                        }
-                        output.Write(reference.IsAnonymous);
+                        output.Write(reference.GroupCount); // Amount of different message references found in the same method.
 
-                        output.Write(reference.ClassRank);
-                        output.Write(reference.MethodRank);
-
-                        if (IsOutgoing)
-                        {
-                            output.Write(reference.InstructionRank);
-                        }
-
-                        if (reference.FromClass != null)
-                        {
-                            output.Write(reference.FromClass, false);
-                        }
+                        output.Write(reference.IsStatic); // Is the usage of the message coming from a static method body?
+                        output.Write(reference.ClassRank); // The order of the class(from classes containing methods that reference messages) within the ABC file/block. (First = Lowest, Last = Highest)
+                        output.Write(reference.MethodRank); // The order of the method(from methods containing message references) within the class. (First = Lowest, Last = Highest)
+                        output.Write(reference.InstructionRank); // The order of the message being referenced. (First = Lowest, Last = Highest)
                     }
                 }
-                else output.Write(name);
-                return (Hash = output.GetHash());
+                else output.Write(Class.QName.Name);
+                return (Hash = output.GenerateMD5Hash());
             }
         }
         public bool HasMethodReference(ASMethod method)
@@ -1763,43 +1805,14 @@ namespace HabBit.Habbo
     }
     public class MessageHasher : BinaryWriter
     {
-        public bool IsSorting { get; set; }
-
-        private readonly SortedDictionary<int, int> _ints;
-        private readonly SortedDictionary<bool, int> _bools;
-        private readonly SortedDictionary<byte, int> _bytes;
-        private readonly SortedDictionary<string, int> _strings;
-
-        public MessageHasher(bool isSorting)
+        public MessageHasher()
             : base(new MemoryStream())
-        {
-            _ints = new SortedDictionary<int, int>();
-            _bools = new SortedDictionary<bool, int>();
-            _bytes = new SortedDictionary<byte, int>();
-            _strings = new SortedDictionary<string, int>();
-
-            IsSorting = isSorting;
-        }
-
-        public override void Write(int value)
-        {
-            WriteOrSort(_ints, base.Write, value);
-        }
-        public override void Write(bool value)
-        {
-            WriteOrSort(_bools, base.Write, value);
-        }
-        public override void Write(byte value)
-        {
-            WriteOrSort(_bytes, base.Write, value);
-        }
-        public override void Write(string value)
-        {
-            WriteOrSort(_strings, base.Write, value);
-        }
+        { }
 
         public void Write(ASTrait trait)
         {
+            Write("TRAIT");
+
             Write(trait.Id);
             Write(trait.QName);
             Write(trait.IsStatic);
@@ -1828,6 +1841,8 @@ namespace HabBit.Habbo
         }
         public void Write(ASMethod method)
         {
+            Write("METHOD");
+
             Write(method.IsConstructor);
             if (!method.IsConstructor)
             {
@@ -1865,6 +1880,8 @@ namespace HabBit.Habbo
         }
         public void Write(ASMultiname multiname)
         {
+            Write("MULTINAME");
+
             if (multiname?.Kind == MultinameKind.TypeName)
             {
                 Write(multiname.QName);
@@ -1882,6 +1899,8 @@ namespace HabBit.Habbo
         }
         public void Write(ConstantKind kind, object value)
         {
+            Write("CONSTANT");
+
             Write((byte)kind);
             switch (kind)
             {
@@ -1916,6 +1935,8 @@ namespace HabBit.Habbo
         }
         public void Write(ASContainer container, bool includeTraits)
         {
+            Write("CONTAINER");
+
             Write(container.QName);
             Write(container.IsStatic);
             if (includeTraits)
@@ -1925,7 +1946,7 @@ namespace HabBit.Habbo
             }
         }
 
-        public string GetHash()
+        public string GenerateMD5Hash()
         {
             Flush();
             using (var md5 = MD5.Create())
@@ -1940,47 +1961,17 @@ namespace HabBit.Habbo
                 return hashAsHex.Replace("-", string.Empty).ToLower();
             }
         }
-        public override void Flush()
-        {
-            WriteSorted(_ints, base.Write);
-            WriteSorted(_bools, base.Write);
-            WriteSorted(_bytes, base.Write);
-            WriteSorted(_strings, base.Write);
-        }
-
-        private void WriteSorted<T>(IDictionary<T, int> storage, Action<T> writer)
-        {
-            foreach (KeyValuePair<T, int> storedPair in storage)
-            {
-                writer(storedPair.Key);
-                base.Write(storedPair.Value);
-            }
-        }
-        private void WriteOrSort<T>(IDictionary<T, int> storage, Action<T> writer, T value)
-        {
-            if (IsSorting)
-            {
-                if (storage.ContainsKey(value))
-                {
-                    storage[value]++;
-                }
-                else storage.Add(value, 1);
-            }
-            else writer(value);
-        }
     }
     public class MessageReference
     {
         public bool IsStatic { get; set; }
-        public bool IsAnonymous { get; set; }
-
-        public int GroupCount { get; set; }
 
         public int ClassRank { get; set; }
         public int MethodRank { get; set; }
         public int InstructionRank { get; set; }
 
-        public ASClass FromClass { get; set; }
+        public int GroupCount { get; set; }
+        
         public ASMethod FromMethod { get; set; }
     }
 }
