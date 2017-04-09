@@ -1,5 +1,5 @@
 # HabBit
-Command line tool for allowing the user to remove certain restrictions from the Harble client that do not originally allow it to be used locally.
+Command line tool for allowing the user to remove certain restrictions from the Habbo Hotel client that does not originally allow it to be used locally.
 
 ## Requirements
 * .NET Framework 4.0+
@@ -22,21 +22,22 @@ We can now run some basic functions modifications on the client like so:
 HabBit.exe {Client Path.swf} /clean /dhost /rsa
 ```
 ## Arguments
-| Argument                                                | Description                                                                                                                             | Parameter State |
-|:-------------------------------------------------------:|:---------------------------------------------------------------------------------------------------------------------------------------:|:---------------:|
-| /c (none, zlib, lzma)                                   | Compression to use when assembling client.                                                                                              | **Required**    |
-| /clean                                                  | Sanitizes the client by deobfuscating methods, and renaming invalid identifiers.                                                        | **Optional**    |
-| /dcrypto                                                | Disables all aspects of cryptography within the client(RC4/Handshake).                                                                  | **Optional**    |
-| /dhost                                                  | Disable certain methods in the client to allow it to run from any host.                                                                 | **Optional**    |
-| /dir (directoryName)                                    | Specify a custom output directory, rather than defaulting to the base directory of the specified client.                                | **Required**    |
-| /dlog (functionName)                                    | Enables the client's internal log function, and invokes the external function name **console.log** by default.                          | **Optional**    |
-| /dump                                                   | Dumps Outgoing/Incoming message data to a text file(Header, SHA1, Constructor Signature).                                               | **Optional**    |
-| /fetch (revisionName)                                   | Downloads the latest client, or a specific build based on the provided revision                                                         | **Optional**    |
-| /kshout                                                 | Client will be forced to publicly share the DH(RC4 Stream Cipher) private key to any connected parties.                                 | **Optional**    |
-| /match (clientName clientHeadersName serverHeadersName) | Replaces the headers in the given Client/Server header files by comparing the hashes with the provided client, against the current one. | **Required**    |
-| /mlog (functionName)                                    | Call an external function every time a message is being sent/received with the array of values as a parameter.                          | **Optional**    |
-| /rev  (revisionName)                                    | Sets the client's revision value found in the Outgoing[4000] message class handler.                                                     | **Required**    |
-| /rsa (keySize, modulus exponent)                        | Override the client's internal public RSA keys with a newly generated pair, or an already existing one.                                 | **Optional**    |
+| Argument                                                | Description                                                                                                                             |
+|:-------------------------------------------------------:|:---------------------------------------------------------------------------------------------------------------------------------------:|
+| /c (none : zlib : lzma)                                 | Compression to use when assembling client.                                                                                              |
+| /clean                                                  | Sanitizes the client by deobfuscating methods, and renaming invalid identifiers.                                                        |
+| /dcrypto                                                | Disables all aspects of cryptography within the client(RC4/Handshake).                                                                  |
+| /dhost                                                  | Disable certain methods in the client to allow it to run from any host.                                                                 |
+| /dir (directoryName)                                    | Specify a custom output directory, rather than defaulting to the base directory of the specified client.                                |
+| /dlog (?functionName)                                   | Enables the client's internal log function, and invokes the external function name **console.log** by default.                          |
+| /dump                                                   | Dumps Outgoing/Incoming message data to a text file(Header, SHA1, Constructor Signature).                                               |
+| /fetch (?revisionName)                                  | Downloads the latest client, or a specific build based on the provided revision                                                         |
+| /ilep (port)                                            | Forces the client to connect all SocketConnection instances on a specific port.                                                         |
+| /kshout                                                 | Client will be forced to publicly share the DH(RC4 Stream Cipher) private key to any connected parties.                                 |
+| /match (clientPath clientHeadersPath serverHeadersPath) | Replaces the headers in the given Client/Server header files by comparing the hashes with the provided client, against the current one. |
+| /mlog (?functionName)                                   | Call an external function every time a message is being sent/received with the array of values as a parameter.                          |
+| /rev  (revisionValue)                                   | Sets the client's revision value found in the Outgoing[4000] message class handler.                                                     |
+| /rsa (?keySize : ?(modulus exponent))                   | Override the client's internal public RSA keys with a newly generated pair, or an already existing one.                                 |
 
 #### Default RSA Keys
 ```
