@@ -155,20 +155,14 @@ namespace HabBit.Utilities
         {
             switch (argument)
             {
-                #region Argument: /dcrypto
-                case "/dcrypto":
-                IsDisablingHandshake = true;
-                break;
-                #endregion
-
-                #region Argument: /fetch
-                case "/fetch":
+                #region Argument: /c (none | zlib | lzma)
+                case "/c":
                 {
-                    if (values.Count > 0)
+                    var compression = CompressionKind.None;
+                    if (values.Count > 0 && Enum.TryParse(values.Pop(), true, out compression))
                     {
-                        RemoteRevision = values.Pop();
+                        Compression = compression;
                     }
-                    IsFetchingClient = true;
                     break;
                 }
                 #endregion
@@ -179,13 +173,27 @@ namespace HabBit.Utilities
                 break;
                 #endregion
 
-                #region Argument: /dump
-                case "/dump":
-                IsDumpingMessageData = true;
+                #region Argument: /dcrypto
+                case "/dcrypto":
+                IsDisablingHandshake = true;
                 break;
                 #endregion
 
-                #region Argument: /dlog
+                #region Argument: /dhost
+                case "/dhost":
+                IsDisablingHostChecks = true;
+                break;
+                #endregion
+
+                #region Argument: /dir (directoryName)
+                case "/dir":
+                {
+                    OutputDirectory = values.Pop();
+                    break;
+                }
+                #endregion
+
+                #region Argument: /dlog (?functionName)
                 case "/dlog":
                 {
                     IsEnablingDebugLogger = true;
@@ -197,7 +205,48 @@ namespace HabBit.Utilities
                 }
                 #endregion
 
-                #region Argument: /mlog
+                #region Argument: /dump
+                case "/dump":
+                IsDumpingMessageData = true;
+                break;
+                #endregion
+
+                #region Argument: /fetch (?revisionName)
+                case "/fetch":
+                {
+                    IsFetchingClient = true;
+                    if (values.Count > 0)
+                    {
+                        RemoteRevision = values.Pop();
+                    }
+                    break;
+                }
+                #endregion
+
+                #region Argument: /ilep (port)
+                case "/ilep":
+                LoopbackPort = int.Parse(values.Pop());
+                break;
+                #endregion
+
+                #region Argument: /kshout (messageId)
+                case "/kshout":
+                KeyShouterId = int.Parse(values.Pop());
+                break;
+                #endregion
+
+                #region Argument /match (clientPath clientHeadersPath serverHeadersPath)
+                case "/match":
+                {
+                    IsMatchingMessages = true;
+                    CompareInfo = new FileInfo(values.Pop());
+                    ClientHeadersInfo = new FileInfo(values.Pop());
+                    ServerHeadersInfo = new FileInfo(values.Pop());
+                    break;
+                }
+                #endregion
+
+                #region Argument: /mlog (?functionName)
                 case "/mlog":
                 {
                     IsInjectingMessageLogger = true;
@@ -209,55 +258,13 @@ namespace HabBit.Utilities
                 }
                 #endregion
 
-                #region Argument: /ilep
-                case "/ilep":
-                LoopbackPort = int.Parse(values.Pop());
-                break;
-                #endregion
-
-                #region Argument: /kshout
-                case "/kshout":
-                KeyShouterId = int.Parse(values.Pop());
-                break;
-                #endregion
-
-                #region Argument: /dhost
-                case "/dhost":
-                IsDisablingHostChecks = true;
-                break;
-                #endregion
-
-                #region Argument /match
-                case "/match":
-                {
-                    IsMatchingMessages = true;
-                    CompareInfo = new FileInfo(values.Pop());
-                    ClientHeadersInfo = new FileInfo(values.Pop());
-                    ServerHeadersInfo = new FileInfo(values.Pop());
-                    break;
-                }
-                #endregion
-
-                #region Argument: /c
-                case "/c":
-                {
-                    var compression = CompressionKind.None;
-                    if (values.Count > 0 &&
-                        Enum.TryParse(values.Pop(), true, out compression))
-                    {
-                        Compression = compression;
-                    }
-                    break;
-                }
-                #endregion
-
-                #region Argument: /rev
+                #region Argument: /rev (revisionValue)
                 case "/rev":
                 Revision = values.Pop();
                 break;
                 #endregion
 
-                #region Argument: /rsa
+                #region Argument: /rsa (?keySize | ?(modulus exponent))
                 case "/rsa":
                 {
                     if (values.Count >= 2)
@@ -277,15 +284,6 @@ namespace HabBit.Utilities
                     break;
                 }
                 #endregion
-
-                #region Argument: /dir
-                case "/dir":
-                {
-                    OutputDirectory = values.Pop();
-                    break;
-                }
-                #endregion
-
                 default: return false;
             }
             return true;
