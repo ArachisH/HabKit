@@ -380,7 +380,7 @@ namespace HabBit.Habbo
                     bool isStatic = (fromMethod.Trait?.IsStatic ?? @class.Constructor == fromMethod);
                     var fromContainer = (isStatic ? (ASContainer)@class : instance);
 
-                    List<MessageReference> refernces = FindMessageReferences(fromContainer, fromMethod);
+                    List<MessageReference> refernces = FindMessageReferences(@class, fromContainer, fromMethod);
                     if (refernces.Count > 0)
                     {
                         methodRank++;
@@ -437,8 +437,10 @@ namespace HabBit.Habbo
                     var methodReferenceGroups = new Dictionary<ASMethod, List<MessageReference>>();
                     foreach (MessageReference reference in references)
                     {
+                        reference.FromClass = @class;
                         reference.InstructionRank = -1;
                         reference.ClassRank = classRank;
+                        reference.IsStatic = container.IsStatic;
                         reference.GroupCount = references.Count;
 
                         List<MessageReference> methodReferences = null;
@@ -467,7 +469,7 @@ namespace HabBit.Habbo
                 }
             }
         }
-        private List<MessageReference> FindMessageReferences(ASContainer fromContainer, ASMethod fromMethod)
+        private List<MessageReference> FindMessageReferences(ASClass fromClass, ASContainer fromContainer, ASMethod fromMethod)
         {
             int instructionRank = 0;
             ABCFile abc = fromMethod.GetABC();
@@ -487,7 +489,7 @@ namespace HabBit.Habbo
                     case OPCode.NewFunction:
                     {
                         var newFunction = (NewFunctionIns)instruction;
-                        references.AddRange(FindMessageReferences(fromContainer, newFunction.Method));
+                        references.AddRange(FindMessageReferences(fromClass, fromContainer, newFunction.Method));
                         continue;
                     }
                     case OPCode.GetProperty:
@@ -532,8 +534,10 @@ namespace HabBit.Habbo
 
                 if (message.IsOutgoing)
                 {
+                    reference.FromClass = fromClass;
                     reference.FromMethod = fromMethod;
                     reference.InstructionRank = ++instructionRank;
+                    reference.IsAnonymous = (!fromMethod.IsConstructor && fromMethod.Trait == null);
 
                     references.Add(reference);
                 }
@@ -556,7 +560,6 @@ namespace HabBit.Habbo
                         }
                     }
                     reference.FromMethod = callbackMethod;
-                    reference.IsStatic = callbackMethod.Container.IsStatic;
                 }
             }
             return references;
@@ -1247,20 +1250,32 @@ namespace HabBit.Habbo
             {
                 return Hash;
             }
-            using (var output = new MessageHasher())
+            using (var output = new MessageHasher(false))
             {
                 output.Write(IsOutgoing);
                 if (!HGame.IsValidIdentifier(Class.QName.Name, true))
                 {
+                    output.Write(Class.Instance, true);
+                    output.Write(Class.Instance.Constructor);
+
                     output.Write(References.Count);
                     foreach (MessageReference reference in References)
                     {
-                        output.Write(reference.GroupCount); // Amount of different message references found in the same method.
+                        output.Write(reference.IsStatic);
+                        output.Write(reference.IsAnonymous);
 
-                        output.Write(reference.IsStatic); // Is the usage of the message coming from a static method body?
-                        output.Write(reference.ClassRank); // The order of the class(from classes containing methods that reference messages) within the ABC file/block. (First = Lowest, Last = Highest)
-                        output.Write(reference.MethodRank); // The order of the method(from methods containing message references) within the class. (First = Lowest, Last = Highest)
-                        output.Write(reference.InstructionRank); // The order of the message being referenced. (First = Lowest, Last = Highest)
+                        output.Write(reference.MethodRank);
+                        output.Write(reference.InstructionRank);
+
+                        output.Write(reference.FromMethod);
+
+                        output.Write(reference.FromClass, true);
+                        output.Write(reference.FromClass.Constructor);
+                        output.Write(reference.FromClass.Instance.Constructor);
+                    }
+                    if (!IsOutgoing)
+                    {
+                        output.Write(Parser.Instance, true);
                     }
                 }
                 else output.Write(Class.QName.Name);
@@ -1805,14 +1820,43 @@ namespace HabBit.Habbo
     }
     public class MessageHasher : BinaryWriter
     {
-        public MessageHasher()
+        private readonly SortedDictionary<int, int> _ints;
+        private readonly SortedDictionary<bool, int> _bools;
+        private readonly SortedDictionary<byte, int> _bytes;
+        private readonly SortedDictionary<string, int> _strings;
+
+        public bool IsSorting { get; set; }
+
+        public MessageHasher(bool isSorting)
             : base(new MemoryStream())
-        { }
+        {
+            _ints = new SortedDictionary<int, int>();
+            _bools = new SortedDictionary<bool, int>();
+            _bytes = new SortedDictionary<byte, int>();
+            _strings = new SortedDictionary<string, int>();
+
+            IsSorting = isSorting;
+        }
+
+        public override void Write(int value)
+        {
+            WriteOrSort(_ints, base.Write, value);
+        }
+        public override void Write(bool value)
+        {
+            WriteOrSort(_bools, base.Write, value);
+        }
+        public override void Write(byte value)
+        {
+            WriteOrSort(_bytes, base.Write, value);
+        }
+        public override void Write(string value)
+        {
+            WriteOrSort(_strings, base.Write, value);
+        }
 
         public void Write(ASTrait trait)
         {
-            Write("TRAIT");
-
             Write(trait.Id);
             Write(trait.QName);
             Write(trait.IsStatic);
@@ -1841,18 +1885,11 @@ namespace HabBit.Habbo
         }
         public void Write(ASMethod method)
         {
-            Write("METHOD");
-
             Write(method.IsConstructor);
             if (!method.IsConstructor)
             {
                 Write(method.ReturnType);
-                if (method.Trait != null)
-                {
-                    Write(method.Trait.QName);
-                }
             }
-
             Write(method.Parameters.Count);
             foreach (ASParameter parameter in method.Parameters)
             {
@@ -1862,7 +1899,6 @@ namespace HabBit.Habbo
                 {
                     Write(parameter.Name);
                 }
-
                 Write(parameter.IsOptional);
                 if (parameter.IsOptional)
                 {
@@ -1870,18 +1906,18 @@ namespace HabBit.Habbo
                     Write(parameter.ValueKind, parameter.Value);
                 }
             }
-
             ASCode code = method.Body.ParseCode();
-            foreach (KeyValuePair<OPCode, List<ASInstruction>> group in code.GetOPGroups())
+            foreach (OPCode op in code.GetOPGroups().Keys)
             {
-                Write((byte)group.Key);
-                Write(group.Value.Count);
+                if (op != OPCode.GetLex
+                    && op != OPCode.GetProperty
+                    && op != OPCode.CallProperty) continue;
+
+                Write((byte)op);
             }
         }
         public void Write(ASMultiname multiname)
         {
-            Write("MULTINAME");
-
             if (multiname?.Kind == MultinameKind.TypeName)
             {
                 Write(multiname.QName);
@@ -1899,35 +1935,27 @@ namespace HabBit.Habbo
         }
         public void Write(ConstantKind kind, object value)
         {
-            Write("CONSTANT");
-
             Write((byte)kind);
             switch (kind)
             {
                 case ConstantKind.Double:
                 Write((double)value);
                 break;
-
                 case ConstantKind.Integer:
                 Write((int)value);
                 break;
-
                 case ConstantKind.UInteger:
                 Write((uint)value);
                 break;
-
                 case ConstantKind.String:
                 Write((string)value);
                 break;
-
                 case ConstantKind.Null:
                 Write("null");
                 break;
-
                 case ConstantKind.True:
                 Write(true);
                 break;
-
                 case ConstantKind.False:
                 Write(false);
                 break;
@@ -1935,9 +1963,6 @@ namespace HabBit.Habbo
         }
         public void Write(ASContainer container, bool includeTraits)
         {
-            Write("CONTAINER");
-
-            Write(container.QName);
             Write(container.IsStatic);
             if (includeTraits)
             {
@@ -1946,6 +1971,13 @@ namespace HabBit.Habbo
             }
         }
 
+        public override void Flush()
+        {
+            WriteSorted(_ints, base.Write);
+            WriteSorted(_bools, base.Write);
+            WriteSorted(_bytes, base.Write);
+            WriteSorted(_strings, base.Write);
+        }
         public string GenerateMD5Hash()
         {
             Flush();
@@ -1961,17 +1993,40 @@ namespace HabBit.Habbo
                 return hashAsHex.Replace("-", string.Empty).ToLower();
             }
         }
+
+        private void WriteSorted<T>(IDictionary<T, int> storage, Action<T> writer)
+        {
+            foreach (KeyValuePair<T, int> storedPair in storage)
+            {
+                writer(storedPair.Key);
+                base.Write(storedPair.Value);
+            }
+        }
+        private void WriteOrSort<T>(IDictionary<T, int> storage, Action<T> writer, T value)
+        {
+            if (IsSorting)
+            {
+                if (storage.ContainsKey(value))
+                {
+                    storage[value]++;
+                }
+                else storage.Add(value, 1);
+            }
+            else writer(value);
+        }
     }
     public class MessageReference
     {
         public bool IsStatic { get; set; }
+        public bool IsAnonymous { get; set; }
 
         public int ClassRank { get; set; }
         public int MethodRank { get; set; }
         public int InstructionRank { get; set; }
 
         public int GroupCount { get; set; }
-        
+
+        public ASClass FromClass { get; set; }
         public ASMethod FromMethod { get; set; }
     }
 }
