@@ -124,7 +124,7 @@ namespace HabBit
 
                         int urlStart = (line.IndexOf('=') + 1);
                         flashClientUrl = ("http:" + line.Substring(urlStart) + "Habbo.swf");
-                        
+
                         int revisionStart = (line.IndexOf("gordon/") + 7);
                         string revision = line.Substring(revisionStart, (line.Length - revisionStart) - 1);
 
@@ -347,7 +347,7 @@ namespace HabBit
                     deadMessages.Add(message.Id, message);
                     continue;
                 }
-                
+
                 if (!hashCollisions.TryGetValue(message.Hash, out SortedList<ushort, MessageItem> hashes))
                 {
                     hashes = new SortedList<ushort, MessageItem>();
@@ -398,7 +398,7 @@ namespace HabBit
             }
         }
 
-        private Tuple<int, int> ReplaceHeaders(FileInfo file, IDictionary<ushort, MessageItem> messages, string revision)
+        private Tuple<int, int> ReplaceHeaders(FileInfo file, IDictionary<ushort, MessageItem> previousMessages, string revision)
         {
             int totalMatches = 0;
             int totalValidAttempts = 0; // If no message exist, or is an invalid header, do not count towards total attempts. (Not my fault no matches are found, bruh)
@@ -425,46 +425,69 @@ namespace HabBit
                         }
                     }
 
-                    Match declaration = Regex.Match(line, @"^(?<start>(.*?))(?<id>\b[+-]?[0-9]\d*(\.\d+)?)(?<end>$)");
+                    Match declaration = Regex.Match(line, @"(?<start>(.*?)[^""])(?<id>[+-]?[0-9]\d*(\.\d+)?)\b(?<end>[^\r|$]*)");
                     if (declaration.Success)
                     {
+                        ushort prevHeader = 0;
                         var suffix = string.Empty;
-                        MessageItem prevMessage = null;
-                        List<MessageItem> group = null;
+                        MessageItem previousMessage = null;
+                        List<MessageItem> similarMessages = null;
 
                         string end = declaration.Groups["end"].Value;
                         string start = declaration.Groups["start"].Value;
                         string headerString = declaration.Groups["id"].Value;
 
                         totalValidAttempts++;
-                        if (!ushort.TryParse(headerString, out ushort prevHeader))
+                        if (!ushort.TryParse(headerString, out prevHeader))
                         {
                             totalValidAttempts--;
                             suffix = " //! Invalid Header";
                         }
-                        else if (!messages.TryGetValue(prevHeader, out prevMessage))
+                        else if (!previousMessages.TryGetValue(prevHeader, out previousMessage))
                         {
                             totalValidAttempts--;
                             headerString = "-1";
                             suffix = $" //! Unknown Message({prevHeader})";
                         }
-                        else if (!Game.Messages.TryGetValue(prevMessage.Hash, out group))
+                        else if (!Game.Messages.TryGetValue(previousMessage.Hash, out similarMessages))
                         {
                             headerString = "-1";
                             suffix = $" //! Zero Matches({prevHeader})";
                         }
-                        else if (group.Count > 1)
+                        else if (similarMessages.Count > 1)
                         {
                             headerString = "-1";
                             suffix = $" //! Duplicate Matches({prevHeader})";
-                            foreach (MessageItem similarMessage in group)
+                            foreach (MessageItem similarMessage in similarMessages)
                             {
-                                if (prevMessage.Class.QName.Name == similarMessage.Class.QName.Name)
+                                if (previousMessage.Class.QName.Name == similarMessage.Class.QName.Name)
                                 {
                                     totalMatches++;
                                     suffix = (" // " + prevHeader);
                                     headerString = similarMessage.Id.ToString();
                                     break;
+                                }
+                                else
+                                {
+                                    int previousClassRankTotal = 0;
+                                    foreach (MessageReference reference in previousMessage.References)
+                                    {
+                                        previousClassRankTotal += reference.ClassRank;
+                                    }
+
+                                    int similarClassRankTotal = 0;
+                                    foreach (MessageReference similarReference in similarMessage.References)
+                                    {
+                                        similarClassRankTotal += similarReference.ClassRank;
+                                    }
+
+                                    if (previousClassRankTotal == similarClassRankTotal)
+                                    {
+                                        totalMatches++;
+                                        suffix = (" // " + prevHeader);
+                                        headerString = similarMessage.Id.ToString();
+                                        break;
+                                    }
                                 }
                             }
                         }
@@ -472,7 +495,7 @@ namespace HabBit
                         {
                             totalMatches++;
                             suffix = (" // " + prevHeader);
-                            headerString = group[0].Id.ToString();
+                            headerString = similarMessages[0].Id.ToString();
                         }
                         line = $"{start}{headerString}{end}{suffix}";
                     }
