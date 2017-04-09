@@ -17,9 +17,9 @@ Some black box should have appeared, the next step involves changing the current
 ```
 cd C:\Users\{Username}\Desktop\HabBit
 ```
-We can now run some basic functions modifications on the client like so:
+We can now run some basic functions on the client like so:
 ```
-HabBit.exe {Client Path.swf} /clean /dhost /rsa
+HabBit.exe Client.swf /clean /dhost /rsa
 ```
 ## Arguments
 | Argument                                                | Description                                                                                                                             |
