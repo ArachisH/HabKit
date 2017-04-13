@@ -566,6 +566,56 @@ namespace HabBit.Habbo
         }
         #endregion
 
+        public bool InjectValueMiner()
+        {
+            ABCFile abc = ABCFiles.Last();
+            ASInstance decoderInstance = abc.GetFirstInstance("_-1l6");
+
+            var structureQName = new ASMultiname(abc.Pool);
+            structureQName.NameIndex = abc.Pool.AddConstant("structure");
+            structureQName.Kind = MultinameKind.QName;
+            structureQName.NamespaceIndex = 1; // Public
+
+            var structureSlot = new ASTrait(abc);
+            structureSlot.Kind = TraitKind.Slot;
+            structureSlot.QNameIndex = abc.Pool.AddConstant(structureQName);
+            structureSlot.TypeIndex = abc.Pool.GetMultinameIndices("Array").First();
+            decoderInstance.Traits.Add(structureSlot);
+
+            ASCode ctorCode = decoderInstance.Constructor.Body.ParseCode();
+            ctorCode.InsertRange(ctorCode.Count - 2, new ASInstruction[]
+            {
+                new GetLocal0Ins(),
+                new NewArrayIns(0),
+                new SetPropertyIns(abc) { PropertyNameIndex = structureSlot.QNameIndex }
+            });
+            decoderInstance.Constructor.Body.Code = ctorCode.ToArray();
+
+            var addTypeMethod = new ASMethod(abc);
+            addTypeMethod.ReturnTypeIndex = 2; // void
+            int addTypeMethodIndex = abc.AddMethod(addTypeMethod);
+
+            var valueParam = new ASParameter(abc, addTypeMethod);
+            valueParam.NameIndex = abc.Pool.AddConstant("value");
+            valueParam.TypeIndex = abc.Pool.GetMultinameIndices("Object").First();
+            addTypeMethod.Parameters.Add(valueParam);
+            
+            var addTypeBody = new ASMethodBody(abc);
+            addTypeBody.MethodIndex = addTypeMethodIndex;
+            addTypeBody.InitialScopeDepth = 5;
+            addTypeBody.Code = new byte[0];
+            addTypeBody.MaxScopeDepth = 6;
+            addTypeBody.LocalCount = 10;
+            addTypeBody.MaxStack = 5;
+            abc.AddMethodBody(addTypeBody);
+
+            var addTypeCode = new ASCode(abc, addTypeBody);
+            addTypeBody.Code = addTypeCode.ToArray();
+
+            decoderInstance.AddMethod(addTypeMethod, "addType");
+            return true;
+        }
+
         public bool DisableHandshake()
         {
             if (!DisableEncryption()) return false;
