@@ -157,7 +157,8 @@ namespace HabBit.Habbo
                         }
                         else name = $"local{(register - parameters.Count) + 1}";
 
-                        if (!nameIndices.TryGetValue(name, out int nameIndex))
+                        int nameIndex = -1;
+                        if (!nameIndices.TryGetValue(name, out nameIndex))
                         {
                             nameIndex = abc.Pool.AddConstant(name, false);
                             nameIndices.Add(name, nameIndex);
@@ -351,7 +352,8 @@ namespace HabBit.Habbo
             foreach (MessageItem message in OutMessages.Values.Concat(InMessages.Values))
             {
                 message.GenerateHash();
-                if (!Messages.TryGetValue(message.Hash, out List<MessageItem> group))
+                List<MessageItem> group = null;
+                if (!Messages.TryGetValue(message.Hash, out group))
                 {
                     group = new List<MessageItem>();
                     Messages.Add(message.Hash, group);
@@ -599,7 +601,7 @@ namespace HabBit.Habbo
             valueParam.NameIndex = abc.Pool.AddConstant("value");
             valueParam.TypeIndex = abc.Pool.GetMultinameIndices("Object").First();
             addTypeMethod.Parameters.Add(valueParam);
-            
+
             var addTypeBody = new ASMethodBody(abc);
             addTypeBody.MethodIndex = addTypeMethodIndex;
             addTypeBody.InitialScopeDepth = 5;
@@ -1611,7 +1613,8 @@ namespace HabBit.Habbo
                             classToCheck = classToCheck.GetABC().GetFirstClass(getLex.TypeName.Name);
                         }
 
-                        if (TryGetTraitTypeName(classToCheck, propertyName, out string propertyTypeName) ||
+                        string propertyTypeName = null;
+                        if (TryGetTraitTypeName(classToCheck, propertyName, out propertyTypeName) ||
                             TryGetTraitTypeName(classToCheck.Instance, propertyName, out propertyTypeName))
                         {
                             structure.Add(propertyTypeName);
@@ -1719,7 +1722,8 @@ namespace HabBit.Habbo
                     }
                     while (next.OP != OPCode.GetProperty && next.OP != OPCode.CallProperty);
 
-                    if (TryGetTraitTypeName(classToCheck, propertyName, out string propertyTypeName) ||
+                    string propertyTypeName = null;
+                    if (TryGetTraitTypeName(classToCheck, propertyName, out propertyTypeName) ||
                         TryGetTraitTypeName(classToCheck?.Instance, propertyName, out propertyTypeName))
                     {
                         structure.Add(propertyTypeName);
@@ -1757,7 +1761,8 @@ namespace HabBit.Habbo
                         classToCheck = classToCheck.GetABC().GetFirstClass(getLex.TypeName.Name);
                     }
 
-                    if (TryGetTraitTypeName(classToCheck, propertyName, out string propertyTypeName) ||
+                    string propertyTypeName = null;
+                    if (TryGetTraitTypeName(classToCheck, propertyName, out propertyTypeName) ||
                         TryGetTraitTypeName(classToCheck.Instance, propertyName, out propertyTypeName))
                     {
                         structure[--length] = propertyTypeName;
@@ -1780,8 +1785,9 @@ namespace HabBit.Habbo
                 ASInstruction instruction = code[i];
                 if (!Local.IsSetLocal(instruction.OP)) continue;
 
+                int structIndex = -1;
                 var local = (Local)instruction;
-                if (pushedLocals.TryGetValue(local.Register, out int structIndex))
+                if (pushedLocals.TryGetValue(local.Register, out structIndex))
                 {
                     ASInstruction beforeSet = code[i - 1];
                     pushedLocals.Remove(local.Register);
