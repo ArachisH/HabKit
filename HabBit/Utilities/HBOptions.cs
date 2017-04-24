@@ -1,6 +1,9 @@
 ﻿using System;
 using System.IO;
+using System.Reflection;
 using System.Collections.Generic;
+
+using HabBit.Commands;
 
 using Flazzy;
 
@@ -8,285 +11,143 @@ namespace HabBit.Utilities
 {
     public class HBOptions
     {
-        /// <summary>
-        /// Gets or sets the output directory where all the files will be saved to.
-        /// </summary>
-        public string OutputDirectory { get; set; }
+        private static readonly Dictionary<string, PropertyInfo> _commands;
+        private static readonly Dictionary<PropertyInfo, CommandAttribute> _attributes;
 
-        /// <summary>
-        /// Gets or sets a value that determines whether to download the latest client.
-        /// </summary>
-        public bool IsFetchingClient { get; set; }
+        public FileInfo GameInfo { get; set; }
+        public GameAccess HighestAccess { get; set; }
 
-        /// <summary>
-        /// Gets or sets a value that determines whether to enable the client's internal debug function.
-        /// </summary>
-        public bool IsEnablingDebugLogger { get; set; }
-
-        /// <summary>
-        /// Get or sets the name of the external function that will be invoked when a 'log(... args)' task is performed in the client.
-        /// </summary>
-        public string DebugLogFunctionName { get; set; }
-
-        /// <summary>
-        /// Gets or sets the remote revion of the client to fetch.
-        /// </summary>
-        public string RemoteRevision { get; set; }
-
-        /// <summary>
-        /// Gets or sets the file info of the file to be process.
-        /// </summary>
-        public FileInfo ClientInfo { get; set; }
-
-        /// <summary>
-        /// Get or sets the compression kind to use on the client after it has been modified.
-        /// </summary>
+        [Command("/c", GameAccess.Write)]
         public CompressionKind? Compression { get; set; }
 
-        /// <summary>
-        /// Gets or sets the client's revision value found in the Outgoing[4000] message class handler.
-        /// </summary>
-        public string Revision { get; set; }
-
-        /// <summary>
-        /// Gets or sets a value that determines whether to disable certain methods in the client to allow it to run from any host.
-        /// </summary>
-        public bool IsDisablingHostChecks { get; set; }
-
-        /// <summary>
-        /// Gets or sets a value that determines whether to dump Outgoing/Incoming message data to a text file(Header, MD5, Constructor Signature).
-        /// </summary>
-        public bool IsDumpingMessageData { get; set; }
-
-        /// <summary>
-        /// Gets or sets whether to disable the handshake process being initiated by the client.
-        /// </summary>
-        public bool IsDisablingHandshake { get; set; }
-
-        /// <summary>
-        /// Gets or sets whether to sanitize the client by deobfuscating methods, and renaming invalid identifiers.
-        /// </summary>
+        [Command("/clean", GameAccess.Write)]
         public bool IsSanitizing { get; set; }
 
-        /// <summary>
-        /// Gets or sets the public/private RSA Keys.
-        /// </summary>
-        public HBRSAKeys Keys { get; set; }
+        [Command("/dcrypto", GameAccess.Write)]
+        public bool IsDisablingHandshake { get; set; }
 
-        /// <summary>
-        /// Gets or sets whether to match the provided file of hashes against the current client hashes.
-        /// </summary>
-        public bool IsMatchingMessages { get; set; }
+        [Command("/dhost", GameAccess.Write)]
+        public bool IsDisablingHostChecks { get; set; }
 
-        /// <summary>
-        /// Gets or sets the client file that will be compared to the current client for hash matches.
-        /// </summary>
-        public FileInfo CompareInfo { get; set; }
+        [Command("/dir", GameAccess.None)]
+        public string OutputDirectory { get; set; }
 
-        /// <summary>
-        /// Gets or sets the file containing the Outgoing headers relative to the client.
-        /// </summary>
-        public FileInfo ClientHeadersInfo { get; set; }
+        [Command("/dlog", GameAccess.Write, Default = "console.log")]
+        public string DebugLogger { get; set; }
 
-        /// <summary>
-        /// Gets or sets the file containing the Incoming headers relative to the client.
-        /// </summary>
-        public FileInfo ServerHeadersInfo { get; set; }
+        [Command("/dump", GameAccess.Read)]
+        public bool IsDumpingMessageData { get; set; }
 
-        /// <summary>
-        /// Gets or sets a value that determines whether to override the client's internal public RSA keys.
-        /// </summary>
-        public bool IsReplacingRSAKeys { get; set; }
+        [Command("/fetch", GameAccess.None, Default = "?")]
+        public string FetchRevision { get; set; }
 
-        /// <summary>
-        /// Gets or sets the id of the message that will publicly share the DH(RC4 Stream Cypher Key) private key to any connected parties. 
-        /// </summary>
-        public int KeyShouterId { get; set; } = -1;
+        [Command("/hardep", GameAccess.Write)]
+        public HardEPCommand HardEPInfo { get; set; }
 
-        /// <summary>
-        /// Gets or sets the port of the loopback endpoint to inject into the client.
-        /// </summary>
-        public int LoopbackPort { get; set; } = -1;
+        [Command("/kshout", GameAccess.Write, Default = 4001)]
+        public int? KeyShouterId { get; set; }
 
-        /// <summary>
-        /// Get or sets the name of the external function that will be called with the array of values being sent/received.
-        /// </summary>
-        public string MessageLogFunctionName { get; set; }
+        [Command("/match", GameAccess.Read)]
+        public MatchCommand MatchInfo { get; set; }
 
-        /// <summary>
-        /// Gets or sets a value that determines whether to call an external function every time a message is being sent/received with the array of values as a parameter.
-        /// </summary>
-        public bool IsInjectingMessageLogger { get; set; }
+        [Command("/mlog", GameAccess.Write, Default = "FlashExternalInterface.logDebug")]
+        public string MessageLogger { get; set; }
 
-        public HBOptions(string[] args)
+        [Command("/rev", GameAccess.Write)]
+        public string Revision { get; set; }
+
+        [Command("/rsa", GameAccess.Write)]
+        public RSACommand RSAInfo { get; set; }
+
+        static HBOptions()
         {
-            ClientInfo = new FileInfo(args[0]);
-            if (!ClientInfo.Exists)
-            {
-                ClientInfo = null;
-            }
+            _commands = new Dictionary<string, PropertyInfo>();
+            _attributes = new Dictionary<PropertyInfo, CommandAttribute>();
 
-            var valus = new Stack<string>();
-            var arguments = new Stack<string>(args);
-            while (arguments.Count > 0)
+            PropertyInfo[] properties = typeof(HBOptions).GetProperties();
+            foreach (PropertyInfo property in properties)
             {
-                string argument = arguments.Pop();
-                if (!ParseArgument(argument, valus))
-                {
-                    valus.Push(argument);
-                }
-            }
+                var commandAtts = (CommandAttribute[])property.GetCustomAttributes(typeof(CommandAttribute), false);
+                if (commandAtts.Length == 0) continue;
 
-            if (string.IsNullOrWhiteSpace(OutputDirectory))
-            {
-                if (ClientInfo == null)
-                {
-                    OutputDirectory = Environment.CurrentDirectory;
-                }
-                else
-                {
-                    OutputDirectory = ClientInfo.DirectoryName;
-                }
+                CommandAttribute commandAtt = commandAtts[0];
+                _commands.Add(commandAtt.Name, property);
+                _attributes.Add(property, commandAtt);
             }
-            else OutputDirectory = Path.Combine(Environment.CurrentDirectory, OutputDirectory);
         }
 
-        private bool ParseArgument(string argument, Stack<string> values)
+        public static HBOptions Parse(string[] args)
         {
-            switch (argument)
+            var options = new HBOptions();
+            var arguments = new Queue<string>(args);
+
+            options.GameInfo = new FileInfo(arguments.Peek());
+            if (!options.GameInfo.Exists)
             {
-                #region Argument: /c (none | zlib | lzma)
-                case "/c":
-                {
-                    var compression = CompressionKind.None;
-                    if (values.Count > 0 && Enum.TryParse(values.Pop(), true, out compression))
-                    {
-                        Compression = compression;
-                    }
-                    break;
-                }
-                #endregion
-
-                #region Argument: /clean
-                case "/clean":
-                IsSanitizing = true;
-                break;
-                #endregion
-
-                #region Argument: /dcrypto
-                case "/dcrypto":
-                IsDisablingHandshake = true;
-                break;
-                #endregion
-
-                #region Argument: /dhost
-                case "/dhost":
-                IsDisablingHostChecks = true;
-                break;
-                #endregion
-
-                #region Argument: /dir (directoryName)
-                case "/dir":
-                {
-                    OutputDirectory = values.Pop();
-                    break;
-                }
-                #endregion
-
-                #region Argument: /dlog (?functionName)
-                case "/dlog":
-                {
-                    IsEnablingDebugLogger = true;
-                    if (values.Count > 0)
-                    {
-                        DebugLogFunctionName = values.Pop();
-                    }
-                    break;
-                }
-                #endregion
-
-                #region Argument: /dump
-                case "/dump":
-                IsDumpingMessageData = true;
-                break;
-                #endregion
-
-                #region Argument: /fetch (?revisionName)
-                case "/fetch":
-                {
-                    IsFetchingClient = true;
-                    if (values.Count > 0)
-                    {
-                        RemoteRevision = values.Pop();
-                    }
-                    break;
-                }
-                #endregion
-
-                #region Argument: /ilep (port)
-                case "/ilep":
-                LoopbackPort = int.Parse(values.Pop());
-                break;
-                #endregion
-
-                #region Argument: /kshout (messageId)
-                case "/kshout":
-                KeyShouterId = int.Parse(values.Pop());
-                break;
-                #endregion
-
-                #region Argument /match (clientPath clientHeadersPath serverHeadersPath)
-                case "/match":
-                {
-                    IsMatchingMessages = true;
-                    CompareInfo = new FileInfo(values.Pop());
-                    ClientHeadersInfo = new FileInfo(values.Pop());
-                    ServerHeadersInfo = new FileInfo(values.Pop());
-                    break;
-                }
-                #endregion
-
-                #region Argument: /mlog (?functionName)
-                case "/mlog":
-                {
-                    IsInjectingMessageLogger = true;
-                    if (values.Count > 0)
-                    {
-                        MessageLogFunctionName = values.Pop();
-                    }
-                    break;
-                }
-                #endregion
-
-                #region Argument: /rev (revisionValue)
-                case "/rev":
-                Revision = values.Pop();
-                break;
-                #endregion
-
-                #region Argument: /rsa (?keySize | ?(modulus exponent))
-                case "/rsa":
-                {
-                    if (values.Count >= 2)
-                    {
-                        string modulus = values.Pop();
-                        string exponent = values.Pop();
-                        Keys = new HBRSAKeys(modulus, exponent);
-                    }
-                    else if (values.Count == 1)
-                    {
-                        int keySize = 1024;
-                        int.TryParse(values.Pop(), out keySize);
-                        Keys = new HBRSAKeys(keySize);
-                    }
-                    else Keys = new HBRSAKeys();
-                    IsReplacingRSAKeys = true;
-                    break;
-                }
-                #endregion
-                default: return false;
+                options.GameInfo = null;
             }
-            return true;
+            else arguments.Dequeue();
+
+            while (arguments.Count > 0)
+            {
+                string command = arguments.Dequeue();
+                var parameters = new Queue<string>();
+                while (arguments.Count > 0 && !arguments.Peek().StartsWith("/"))
+                {
+                    parameters.Enqueue(arguments.Dequeue());
+                }
+                PropertyInfo property = null;
+                if (_commands.TryGetValue(command, out property))
+                {
+                    CommandAttribute commandAtt = _attributes[property];
+                    if ((int)options.HighestAccess < (int)commandAtt.Access)
+                    {
+                        options.HighestAccess = commandAtt.Access;
+                    }
+
+                    object value = null;
+                    if (parameters.Count > 0 || commandAtt.Default == null)
+                    {
+                        value = GenerateValue(property, parameters);
+                    }
+                    else value = commandAtt.Default;
+                    property.SetValue(options, value, null);
+                }
+            }
+            return options;
+        }
+
+        private static object GenerateValue(PropertyInfo property, Queue<string> parameters)
+        {
+            Type propType = property.PropertyType;
+            propType = (Nullable.GetUnderlyingType(propType) ?? propType);
+
+            if (propType.IsEnum)
+            {
+                return Enum.Parse(propType, parameters.Dequeue(), true);
+            }
+            else if (propType.IsSubclassOf(typeof(Command)))
+            {
+                var commandObj = (Command)Activator.CreateInstance(propType);
+                if (parameters.Count > 0)
+                {
+                    commandObj.Populate(parameters);
+                }
+                return commandObj;
+            }
+            else if (propType == typeof(bool))
+            {
+                return true;
+            }
+            else if (propType == typeof(string))
+            {
+                return parameters.Dequeue();
+            }
+            else if (propType == typeof(int))
+            {
+                return int.Parse(parameters.Dequeue());
+            }
+            return null;
         }
     }
 }
