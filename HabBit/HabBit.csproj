@@ -44,12 +44,17 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Commands\Command.cs" />
+    <Compile Include="Commands\Enums\GameAccess.cs" />
+    <Compile Include="Commands\HardEPCommand.cs" />
+    <Compile Include="Commands\MatchCommand.cs" />
+    <Compile Include="Commands\RSACommand.cs" />
     <Compile Include="Habbo\HGame.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Commands\CommandAttribute.cs" />
     <Compile Include="Utilities\ConsoleEx.cs" />
     <Compile Include="Utilities\HBOptions.cs" />
-    <Compile Include="Utilities\HBRSAKeys.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Submodules\Flazzy\Flazzy\Flazzy.csproj">
