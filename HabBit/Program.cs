@@ -470,7 +470,7 @@ namespace HabBit
                             suffix = (" // " + prevHeader);
                             headerString = similarMessages[0].Id.ToString();
                         }
-                        if (!isCritical)
+                        if (!isCritical && Options.MatchInfo.MinimalComments)
                         {
                             suffix = null;
                         }
