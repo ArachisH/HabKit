@@ -568,8 +568,10 @@ namespace HabBit.Habbo
         }
         #endregion
 
-        public bool InjectValueMiner()
+        private bool InjectValueMiner()
         {
+            throw new NotSupportedException();
+
             ABCFile abc = ABCFiles.Last();
             ASInstance decoderInstance = abc.GetFirstInstance("_-1l6");
 
@@ -702,7 +704,7 @@ namespace HabBit.Habbo
             }
             return DisableHostChanges();
         }
-        public bool InjectKeyShouter(int id)
+        public bool InjectKeyShouter(int messageId)
         {
             ABCFile abc = ABCFiles.Last();
             ASClass socketConnClass = abc.GetFirstClass("SocketConnection");
@@ -740,7 +742,7 @@ namespace HabBit.Habbo
             pubKeyVerCode.InsertRange(pubKeyVerCode.Count - 5, new ASInstruction[]
             {
                 new GetLocal2Ins(),
-                new PushIntIns(abc, id),
+                new PushIntIns(abc, messageId),
                 new GetLocalIns(6),
                 new CallPropVoidIns(abc) { PropertyNameIndex = sendFunction.QNameIndex, ArgCount = 2 }
             });
@@ -748,7 +750,7 @@ namespace HabBit.Habbo
             pubKeyVerifyMethod.Body.Code = pubKeyVerCode.ToArray();
             return true;
         }
-        public bool InjectLoopbackEndpoint(int port)
+        public bool InjectEndPoint(string host, int port)
         {
             ABCFile abc = ABCFiles.Last();
 
@@ -774,7 +776,7 @@ namespace HabBit.Habbo
             initMethod.Body.Code = code.ToArray();
             return true;
         }
-        public bool EnableDebugLogger(string functionName = null)
+        public bool InjectDebugLogger(string functionName)
         {
             ABCFile abc = ABCFiles[1];
 
@@ -802,9 +804,7 @@ namespace HabBit.Habbo
             var ifNotAvailable = new IfFalseIns() { Offset = 1 };
             ASInstruction jumpExit = code[code.IndexOf(OPCode.ReturnVoid)];
 
-            functionName = (functionName ?? "console.log");
             int functionNameIndex = abc.Pool.AddConstant(functionName, false);
-
             code.InsertRange(startIndex, new ASInstruction[]
             {
                 new GetLexIns(abc) { TypeNameIndex = externalInterfaceQNameIndex },
@@ -822,7 +822,7 @@ namespace HabBit.Habbo
             logMethod.Body.MaxStack += 3;
             return true;
         }
-        public bool InjectMessageLogger(string functionName = null)
+        public bool InjectMessageLogger(string functionName)
         {
             ASClass coreClass = ABCFiles[1].GetFirstClass("Core");
             if (coreClass == null) return false;
