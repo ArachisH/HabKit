@@ -50,9 +50,6 @@ namespace HabBit.Utilities
         [Command("/match", CommandActions.Extract)]
         public MatchCommand MatchInfo { get; set; }
 
-        [Command("/mlog", CommandActions.Modify, Default = "FlashExternalInterface.logDebug")]
-        public string MessageLogger { get; set; }
-
         [Command("/rev", CommandActions.Modify)]
         public string Revision { get; set; }
 
