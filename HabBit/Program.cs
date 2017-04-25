@@ -85,6 +85,13 @@ namespace HabBit
                 ConsoleEx.WriteLineTitle("Disassembling");
                 Disassemble();
 
+
+                if (isModifying)
+                {
+                    ConsoleEx.WriteLineTitle("Modifying");
+                    Modify();
+                }
+                // Perform this right after modification, in case the '/clean', and '/dump' command combination is present.
                 if (isExtracting)
                 {
                     ConsoleEx.WriteLineTitle("Extracting");
@@ -92,9 +99,6 @@ namespace HabBit
                 }
                 if (isModifying)
                 {
-                    ConsoleEx.WriteLineTitle("Modifying");
-                    Modify();
-
                     ConsoleEx.WriteLineTitle("Assembling");
                     Assemble();
                 }
@@ -188,12 +192,6 @@ namespace HabBit
             {
                 Console.Write($"Injecting Debug Logger(\"{Options.DebugLogger}\")...");
                 Game.InjectDebugLogger(Options.DebugLogger).WriteLineResult();
-            }
-
-            if (!string.IsNullOrWhiteSpace(Options.MessageLogger))
-            {
-                Console.Write($"Injecting Message Logger(\"{Options.MessageLogger}\")...");
-                Game.InjectMessageLogger(Options.MessageLogger).WriteLineResult();
             }
 
             if (!string.IsNullOrWhiteSpace(Options.Revision))
