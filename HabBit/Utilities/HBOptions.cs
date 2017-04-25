@@ -15,48 +15,48 @@ namespace HabBit.Utilities
         private static readonly Dictionary<PropertyInfo, CommandAttribute> _attributes;
 
         public FileInfo GameInfo { get; set; }
-        public GameAccess HighestAccess { get; set; }
+        public CommandActions Actions { get; set; }
 
-        [Command("/c", GameAccess.Write)]
+        [Command("/c", CommandActions.Modify)]
         public CompressionKind? Compression { get; set; }
 
-        [Command("/clean", GameAccess.Write)]
+        [Command("/clean", CommandActions.Modify)]
         public bool IsSanitizing { get; set; }
 
-        [Command("/dcrypto", GameAccess.Write)]
+        [Command("/dcrypto", CommandActions.Modify)]
         public bool IsDisablingHandshake { get; set; }
 
-        [Command("/dhost", GameAccess.Write)]
+        [Command("/dhost", CommandActions.Modify)]
         public bool IsDisablingHostChecks { get; set; }
 
-        [Command("/dir", GameAccess.None)]
+        [Command("/dir", CommandActions.None)]
         public string OutputDirectory { get; set; }
 
-        [Command("/dlog", GameAccess.Write, Default = "console.log")]
+        [Command("/dlog", CommandActions.Modify, Default = "console.log")]
         public string DebugLogger { get; set; }
 
-        [Command("/dump", GameAccess.Read)]
+        [Command("/dump", CommandActions.Extract)]
         public bool IsDumpingMessageData { get; set; }
 
-        [Command("/fetch", GameAccess.None, Default = "?")]
+        [Command("/fetch", CommandActions.Fetch, Default = "?")]
         public string FetchRevision { get; set; }
 
-        [Command("/hardep", GameAccess.Write)]
+        [Command("/hardep", CommandActions.Modify)]
         public HardEPCommand HardEPInfo { get; set; }
 
-        [Command("/kshout", GameAccess.Write, Default = 4001)]
+        [Command("/kshout", CommandActions.Modify, Default = 4001)]
         public int? KeyShouterId { get; set; }
 
-        [Command("/match", GameAccess.Read)]
+        [Command("/match", CommandActions.Extract)]
         public MatchCommand MatchInfo { get; set; }
 
-        [Command("/mlog", GameAccess.Write, Default = "FlashExternalInterface.logDebug")]
+        [Command("/mlog", CommandActions.Modify, Default = "FlashExternalInterface.logDebug")]
         public string MessageLogger { get; set; }
 
-        [Command("/rev", GameAccess.Write)]
+        [Command("/rev", CommandActions.Modify)]
         public string Revision { get; set; }
 
-        [Command("/rsa", GameAccess.Write)]
+        [Command("/rsa", CommandActions.Modify)]
         public RSACommand RSAInfo { get; set; }
 
         static HBOptions()
@@ -100,10 +100,7 @@ namespace HabBit.Utilities
                 if (_commands.TryGetValue(command, out property))
                 {
                     CommandAttribute commandAtt = _attributes[property];
-                    if ((int)options.HighestAccess < (int)commandAtt.Access)
-                    {
-                        options.HighestAccess = commandAtt.Access;
-                    }
+                    options.Actions |= commandAtt.Actions;
 
                     object value = null;
                     if (parameters.Count > 0 || commandAtt.Default == null)

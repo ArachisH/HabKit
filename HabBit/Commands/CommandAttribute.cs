@@ -6,13 +6,13 @@ namespace HabBit.Commands
     public sealed class CommandAttribute : Attribute
     {
         public string Name { get; }
-        public GameAccess Access { get; }
+        public CommandActions Actions { get; }
         public object Default { get; set; }
         
-        public CommandAttribute(string name, GameAccess access)
+        public CommandAttribute(string name, CommandActions actions)
         {
             Name = name;
-            Access = access;
+            Actions = actions;
         }
     }
 }

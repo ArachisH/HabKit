@@ -45,7 +45,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Commands\Command.cs" />
-    <Compile Include="Commands\Enums\GameAccess.cs" />
+    <Compile Include="Commands\Enums\CommandActions.cs" />
     <Compile Include="Commands\HardEPCommand.cs" />
     <Compile Include="Commands\MatchCommand.cs" />
     <Compile Include="Commands\RSACommand.cs" />
