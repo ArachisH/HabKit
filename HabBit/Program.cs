@@ -72,35 +72,29 @@ namespace HabBit
 
         private void Run()
         {
-            if (!string.IsNullOrWhiteSpace(Options.FetchRevision))
+            if (Options.Actions.HasFlag(CommandActions.Fetch))
             {
                 ConsoleEx.WriteLineTitle("Fetching");
                 Fetch();
             }
 
-            bool canRead = (Options.HighestAccess >= GameAccess.Read);
-            bool canWrite = (Options.HighestAccess >= GameAccess.Write);
-
-            if (canRead)
+            bool isModifying = Options.Actions.HasFlag(CommandActions.Modify);
+            bool isExtracting = Options.Actions.HasFlag(CommandActions.Extract);
+            if (isModifying || isExtracting)
             {
                 ConsoleEx.WriteLineTitle("Disassembling");
                 Disassemble();
 
-                if (canWrite)
-                {
-                    ConsoleEx.WriteLineTitle("Modifying");
-                    Modify();
-                }
-
-                // Modify before dumping any sort of data.
-                if (Options.IsDumpingMessageData || Options.MatchInfo != null)
+                if (isExtracting)
                 {
                     ConsoleEx.WriteLineTitle("Extracting");
                     Extract();
                 }
-
-                if (canWrite)
+                if (isModifying)
                 {
+                    ConsoleEx.WriteLineTitle("Modifying");
+                    Modify();
+
                     ConsoleEx.WriteLineTitle("Assembling");
                     Assemble();
                 }
