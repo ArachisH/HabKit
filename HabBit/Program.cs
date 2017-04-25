@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Text.RegularExpressions;
 
 using HabBit.Habbo;
+using HabBit.Commands;
 using HabBit.Utilities;
 
 using Flazzy;
@@ -27,40 +28,32 @@ namespace HabBit
         public HGame Game { get; set; }
         public HBOptions Options { get; }
 
-        public bool IsModifying
-        {
-            get
-            {
-                return (Options.IsSanitizing ||
-                    Options.IsReplacingRSAKeys ||
-                    (Options.LoopbackPort > 0) ||
-                    (Options.KeyShouterId >= 0) ||
-                    Options.IsDisablingHandshake ||
-                    Options.IsDisablingHostChecks ||
-                    Options.IsEnablingDebugLogger ||
-                    Options.IsInjectingMessageLogger ||
-                    !string.IsNullOrWhiteSpace(Options.Revision));
-            }
-        }
-        public bool IsExtracting
-        {
-            get
-            {
-                return (Options.IsDumpingMessageData ||
-                    Options.IsMatchingMessages);
-            }
-        }
-
         public Program(string[] args)
         {
-            Options = new HBOptions(args);
-            if (!Options.IsFetchingClient)
+            Options = HBOptions.Parse(args);
+            if (string.IsNullOrWhiteSpace(Options.FetchRevision))
             {
-                Game = new HGame(Options.ClientInfo.FullName);
+                Game = new HGame(Options.GameInfo.FullName);
                 if (Options.Compression == null)
                 {
                     Options.Compression = Game.Compression;
                 }
+            }
+            if (string.IsNullOrWhiteSpace(Options.OutputDirectory))
+            {
+                if (Options.GameInfo == null)
+                {
+                    Options.OutputDirectory = Environment.CurrentDirectory;
+                }
+                else
+                {
+                    Options.OutputDirectory = Options.GameInfo.DirectoryName;
+                }
+            }
+            else
+            {
+                Options.OutputDirectory = Path.Combine(
+                    Environment.CurrentDirectory, Options.OutputDirectory);
             }
         }
         public static void Main(string[] args)
@@ -79,38 +72,40 @@ namespace HabBit
 
         private void Run()
         {
-            if (Options.IsFetchingClient)
+            if (Options.Actions.HasFlag(CommandActions.Fetch))
             {
+                ConsoleEx.WriteLineTitle("Fetching");
                 Fetch();
             }
-            if (IsModifying || IsExtracting)
+
+            bool isModifying = Options.Actions.HasFlag(CommandActions.Modify);
+            bool isExtracting = Options.Actions.HasFlag(CommandActions.Extract);
+            if (isModifying || isExtracting)
             {
+                ConsoleEx.WriteLineTitle("Disassembling");
                 Disassemble();
-            }
-            if (IsModifying)
-            {
-                Modify();
-            }
-            if (IsExtracting)
-            {
-                Extract();
-            }
-            if (IsModifying)
-            {
-                Assemble();
+
+
+                if (isModifying)
+                {
+                    ConsoleEx.WriteLineTitle("Modifying");
+                    Modify();
+                }
+                // Perform this right after modification, in case the '/clean', and '/dump' command combination is present.
+                if (isExtracting)
+                {
+                    ConsoleEx.WriteLineTitle("Extracting");
+                    Extract();
+                }
+                if (isModifying)
+                {
+                    ConsoleEx.WriteLineTitle("Assembling");
+                    Assemble();
+                }
             }
         }
         private void Fetch()
         {
-            string title = "Fetching Client";
-            bool isRevisionKnown = !(string.IsNullOrWhiteSpace(Options.RemoteRevision));
-
-            if (isRevisionKnown)
-            {
-                title += $"({Options.RemoteRevision})";
-            }
-            ConsoleEx.WriteLineTitle("Fetching Client");
-
             var flashClientUrl = string.Empty;
             using (var client = new WebClient())
             {
@@ -128,29 +123,29 @@ namespace HabBit
                         int revisionStart = (line.IndexOf("gordon/") + 7);
                         string revision = line.Substring(revisionStart, (line.Length - revisionStart) - 1);
 
-                        if (!isRevisionKnown)
+                        if (Options.FetchRevision == "?")
                         {
-                            Options.RemoteRevision = revision;
+                            Options.FetchRevision = revision;
                         }
                         else
                         {
                             flashClientUrl = flashClientUrl.Replace(
-                                revision, Options.RemoteRevision);
+                                revision, Options.FetchRevision);
                         }
                         break;
                     }
                 }
 
                 var remoteUri = new Uri(flashClientUrl);
-                Options.ClientInfo = new FileInfo(Path.Combine(Options.OutputDirectory, remoteUri.LocalPath.Substring(8)));
-                Options.OutputDirectory = Directory.CreateDirectory(Options.ClientInfo.DirectoryName).FullName;
+                Options.GameInfo = new FileInfo(Path.Combine(Options.OutputDirectory, remoteUri.LocalPath.Substring(8)));
+                Options.OutputDirectory = Directory.CreateDirectory(Options.GameInfo.DirectoryName).FullName;
 
-                Console.Write($"Downloading Client({Options.RemoteRevision})...");
-                client.DownloadFile(remoteUri, Options.ClientInfo.FullName);
+                Console.Write($"Downloading Client({Options.FetchRevision})...");
+                client.DownloadFile(remoteUri, Options.GameInfo.FullName);
                 ConsoleEx.WriteLineFinished();
             }
 
-            Game = new HGame(Options.ClientInfo.FullName);
+            Game = new HGame(Options.GameInfo.FullName);
             if (Options.Compression == null)
             {
                 Options.Compression = Game.Compression;
@@ -158,8 +153,6 @@ namespace HabBit
         }
         private void Modify()
         {
-            ConsoleEx.WriteLineTitle("Modifying");
-
             if (Options.IsSanitizing)
             {
                 Console.Write("Sanitizing...");
@@ -167,26 +160,26 @@ namespace HabBit
                 ConsoleEx.WriteLineFinished();
             }
 
-            if (Options.LoopbackPort > 0)
+            if (Options.HardEPInfo != null)
             {
-                Console.Write("Injecting Loopback Endpoint...");
-                Game.InjectLoopbackEndpoint(Options.LoopbackPort).WriteLineResult();
+                Console.Write("Injecting Endpoint...");
+                Game.InjectEndPoint(Options.HardEPInfo.Address.Host, Options.HardEPInfo.Address.Port).WriteLineResult();
             }
 
-            if (Options.KeyShouterId >= 0)
+            if (Options.KeyShouterId != null)
             {
-                Console.Write("Injecting Key Shouter...");
-                Game.InjectKeyShouter(Options.KeyShouterId).WriteLineResult();
+                Console.Write($"Injecting RC4 Key Shouter(Message ID: {Options.KeyShouterId})...");
+                Game.InjectKeyShouter((int)Options.KeyShouterId).WriteLineResult();
             }
             else if (Options.IsDisablingHandshake)
             {
                 Console.Write("Disabling Handshake...");
                 Game.DisableHandshake().WriteLineResult();
             }
-            else if (Options.IsReplacingRSAKeys)
+            else if (Options.RSAInfo != null)
             {
                 Console.Write("Replacing RSA Keys...");
-                Game.ReplaceRSAKeys(Options.Keys.Exponent, Options.Keys.Modulus).WriteLineResult();
+                Game.ReplaceRSAKeys(Options.RSAInfo.Exponent, Options.RSAInfo.Modulus).WriteLineResult();
             }
 
             if (Options.IsDisablingHostChecks)
@@ -195,40 +188,20 @@ namespace HabBit
                 Game.DisableHostChecks().WriteLineResult();
             }
 
-            if (Options.IsEnablingDebugLogger)
+            if (!string.IsNullOrWhiteSpace(Options.DebugLogger))
             {
-                Console.Write("Injecting Message Logger");
-                if (!string.IsNullOrWhiteSpace(Options.DebugLogFunctionName))
-                {
-                    Console.Write($"({Options.DebugLogFunctionName})");
-                }
-                Console.Write("...");
-                Game.EnableDebugLogger(Options.DebugLogFunctionName).WriteLineResult();
-            }
-
-            if (Options.IsInjectingMessageLogger)
-            {
-                Console.Write("Injecting Message Logger");
-                if (!string.IsNullOrWhiteSpace(Options.MessageLogFunctionName))
-                {
-                    Console.Write($"({Options.MessageLogFunctionName})");
-                }
-                Console.Write("...");
-                Game.InjectMessageLogger(Options.MessageLogFunctionName).WriteLineResult();
+                Console.Write($"Injecting Debug Logger(\"{Options.DebugLogger}\")...");
+                Game.InjectDebugLogger(Options.DebugLogger).WriteLineResult();
             }
 
             if (!string.IsNullOrWhiteSpace(Options.Revision))
             {
-                string oldRevision = Game.Revision;
-
+                ConsoleEx.WriteLineChanged("Internal Revision Updated", Game.Revision, Options.Revision);
                 Game.Revision = Options.Revision;
-                ConsoleEx.WriteLineChanged("Revision Changed", oldRevision, Game.Revision);
             }
         }
         private void Extract()
         {
-            ConsoleEx.WriteLineTitle("Extracting");
-
             Console.Write("Generating Message Hashes...");
             Game.GenerateMessageHashes();
             ConsoleEx.WriteLineFinished();
@@ -254,34 +227,29 @@ namespace HabBit
                 }
             }
 
-            if (Options.IsMatchingMessages)
+            if (Options.MatchInfo != null)
             {
-                using (var compareGame = new HGame(Options.CompareInfo.FullName))
+                MatchCommand matchInfo = Options.MatchInfo;
+                using (var previousGame = new HGame(matchInfo.PreviousGameInfo.FullName))
                 {
                     Console.Write("Preparing Hash Comparison...");
-                    compareGame.Disassemble();
-                    compareGame.GenerateMessageHashes();
+                    previousGame.Disassemble();
+                    previousGame.GenerateMessageHashes();
                     ConsoleEx.WriteLineFinished();
 
-                    Console.Write($"Matching Outgoing Messages({compareGame.Revision})...");
-                    Tuple<int, int> outResult = ReplaceHeaders(Options.ClientHeadersInfo, compareGame.OutMessages, compareGame.Revision);
-
-                    Console.Write($" | Matches: {outResult.Item1}/{outResult.Item2}");
+                    Console.Write("Matching Outgoing Messages...");
+                    ReplaceHeaders(matchInfo.ClientHeadersInfo, previousGame.OutMessages, previousGame.Revision);
                     ConsoleEx.WriteLineFinished();
 
-                    Console.Write($"Matching Incoming Messages({compareGame.Revision})...");
-                    Tuple<int, int> inResult = ReplaceHeaders(Options.ServerHeadersInfo, compareGame.InMessages, compareGame.Revision);
-
-                    Console.Write($" | Matches: {inResult.Item1}/{inResult.Item2}");
+                    Console.Write("Matching Incoming Messages...");
+                    ReplaceHeaders(matchInfo.ServerHeadersInfo, previousGame.InMessages, previousGame.Revision);
                     ConsoleEx.WriteLineFinished();
                 }
             }
         }
         private void Assemble()
         {
-            ConsoleEx.WriteLineTitle("Assembling");
-
-            string asmdPath = Path.Combine(Options.OutputDirectory, ("asmd_" + Options.ClientInfo.Name));
+            string asmdPath = Path.Combine(Options.OutputDirectory, ("asmd_" + Options.GameInfo.Name));
             using (var asmdStream = File.Open(asmdPath, FileMode.Create))
             using (var asmdOutput = new FlashWriter(asmdStream))
             {
@@ -289,24 +257,22 @@ namespace HabBit
                 Console.WriteLine("File Assembled: " + asmdPath);
             }
 
-            if (Options.IsReplacingRSAKeys)
+            if (Options.RSAInfo != null)
             {
                 string keysPath = Path.Combine(Options.OutputDirectory, "RSAKeys.txt");
                 using (var keysStream = File.Open(keysPath, FileMode.Create))
                 using (var keysOutput = new StreamWriter(keysStream))
                 {
-                    keysOutput.WriteLine("[E]Exponent: " + Options.Keys.Exponent);
-                    keysOutput.WriteLine("[N]Modulus: " + Options.Keys.Modulus);
-                    keysOutput.Write("[D]Private Exponent: " + Options.Keys.PrivateExponent);
+                    keysOutput.WriteLine("[E]Exponent: " + Options.RSAInfo.Exponent);
+                    keysOutput.WriteLine("[N]Modulus: " + Options.RSAInfo.Modulus);
+                    keysOutput.Write("[D]Private Exponent: " + Options.RSAInfo.PrivateExponent);
                     Console.WriteLine("RSA Keys Saved: " + keysPath);
                 }
             }
         }
         private void Disassemble()
         {
-            ConsoleEx.WriteLineTitle("Disassembling");
             Game.Disassemble();
-
             if (!Options.OutputDirectory.EndsWith(Game.Revision))
             {
                 string directoryName = Path.Combine(Options.OutputDirectory, Game.Revision);
@@ -347,8 +313,8 @@ namespace HabBit
                     deadMessages.Add(message.Id, message);
                     continue;
                 }
-
-                if (!hashCollisions.TryGetValue(message.Hash, out SortedList<ushort, MessageItem> hashes))
+                SortedList<ushort, MessageItem> hashes = null;
+                if (!hashCollisions.TryGetValue(message.Hash, out hashes))
                 {
                     hashes = new SortedList<ushort, MessageItem>();
                     hashCollisions.Add(message.Hash, hashes);
@@ -398,18 +364,17 @@ namespace HabBit
             }
         }
 
-        private Tuple<int, int> ReplaceHeaders(FileInfo file, IDictionary<ushort, MessageItem> previousMessages, string revision)
+        private void ReplaceHeaders(FileInfo file, IDictionary<ushort, MessageItem> previousMessages, string revision)
         {
-            int totalMatches = 0;
-            int totalValidAttempts = 0; // If no message exist, or is an invalid header, do not count towards total attempts. (Not my fault no matches are found, bruh)
-            string copyPath = Path.Combine(Options.OutputDirectory, file.Name);
-            using (var fileStream = File.OpenRead(file.FullName))
-            using (var fileOutput = new StreamReader(fileStream))
-            using (var replaceStream = File.Open(copyPath, FileMode.Create))
-            using (var replaceOutput = new StreamWriter(replaceStream))
+            int totalMatches = 0, matchAttempts = 0;
+            using (var fileOutput = new StreamReader(file.FullName))
+            using (var replaceOutput = new StreamWriter(Path.Combine(Options.OutputDirectory, file.Name), false))
             {
-                replaceOutput.WriteLine("// Current: " + Game.Revision);
-                replaceOutput.WriteLine("// Previous: " + revision);
+                if (!Options.MatchInfo.MinimalComments)
+                {
+                    replaceOutput.WriteLine("// Current: " + Game.Revision);
+                    replaceOutput.WriteLine("// Previous: " + revision);
+                }
                 while (!fileOutput.EndOfStream)
                 {
                     string line = fileOutput.ReadLine();
@@ -425,10 +390,11 @@ namespace HabBit
                         }
                     }
 
-                    Match declaration = Regex.Match(line, @"(?<start>(.*?)[^""])(?<id>[+-]?[0-9]\d*(\.\d+)?)\b(?<end>[^\r|$]*)");
+                    Match declaration = Regex.Match(line, Options.MatchInfo.Pattern);
                     if (declaration.Success)
                     {
                         ushort prevHeader = 0;
+                        bool isCritical = false;
                         var suffix = string.Empty;
                         MessageItem previousMessage = null;
                         List<MessageItem> similarMessages = null;
@@ -437,20 +403,23 @@ namespace HabBit
                         string start = declaration.Groups["start"].Value;
                         string headerString = declaration.Groups["id"].Value;
 
-                        totalValidAttempts++;
+                        matchAttempts++;
                         if (!ushort.TryParse(headerString, out prevHeader))
                         {
-                            totalValidAttempts--;
+                            matchAttempts--;
+                            isCritical = true;
                             suffix = " //! Invalid Header";
                         }
                         else if (!previousMessages.TryGetValue(prevHeader, out previousMessage))
                         {
-                            totalValidAttempts--;
+                            matchAttempts--;
+                            isCritical = true;
                             headerString = "-1";
                             suffix = $" //! Unknown Message({prevHeader})";
                         }
                         else if (!Game.Messages.TryGetValue(previousMessage.Hash, out similarMessages))
                         {
+                            isCritical = true;
                             headerString = "-1";
                             suffix = $" //! Zero Matches({prevHeader})";
                         }
@@ -497,12 +466,17 @@ namespace HabBit
                             suffix = (" // " + prevHeader);
                             headerString = similarMessages[0].Id.ToString();
                         }
+                        if (!isCritical && Options.MatchInfo.MinimalComments)
+                        {
+                            suffix = null;
+                        }
                         line = $"{start}{headerString}{end}{suffix}";
+                        line = line.Replace(revision, Game.Revision);
                     }
                     replaceOutput.WriteLine(line);
                 }
             }
-            return Tuple.Create(totalMatches, totalValidAttempts);
+            Console.Write($" | Matches: {totalMatches}/{matchAttempts}");
         }
     }
 }
