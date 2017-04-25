@@ -245,11 +245,11 @@ namespace HabBit
                     previousGame.GenerateMessageHashes();
                     ConsoleEx.WriteLineFinished();
 
-                    Console.Write("Matching Outgoing(Client Headers) Messages...");
+                    Console.Write("Matching Outgoing Messages...");
                     ReplaceHeaders(matchInfo.ClientHeadersInfo, previousGame.OutMessages, previousGame.Revision);
                     ConsoleEx.WriteLineFinished();
 
-                    Console.Write("Matching Incoming(Server Headers) Messages...");
+                    Console.Write("Matching Incoming Messages...");
                     ReplaceHeaders(matchInfo.ServerHeadersInfo, previousGame.InMessages, previousGame.Revision);
                     ConsoleEx.WriteLineFinished();
                 }
@@ -374,11 +374,9 @@ namespace HabBit
 
         private void ReplaceHeaders(FileInfo file, IDictionary<ushort, MessageItem> previousMessages, string revision)
         {
-            string copyPath = Path.Combine(Options.OutputDirectory, file.Name);
-            using (var fileStream = File.OpenRead(file.FullName))
-            using (var fileOutput = new StreamReader(fileStream))
-            using (var replaceStream = File.Open(copyPath, FileMode.Create))
-            using (var replaceOutput = new StreamWriter(replaceStream))
+            int totalMatches = 0, matchAttempts = 0;
+            using (var fileOutput = new StreamReader(file.FullName))
+            using (var replaceOutput = new StreamWriter(Path.Combine(Options.OutputDirectory, file.Name), false))
             {
                 if (!Options.MatchInfo.MinimalComments)
                 {
@@ -413,13 +411,16 @@ namespace HabBit
                         string start = declaration.Groups["start"].Value;
                         string headerString = declaration.Groups["id"].Value;
 
+                        matchAttempts++;
                         if (!ushort.TryParse(headerString, out prevHeader))
                         {
+                            matchAttempts--;
                             isCritical = true;
                             suffix = " //! Invalid Header";
                         }
                         else if (!previousMessages.TryGetValue(prevHeader, out previousMessage))
                         {
+                            matchAttempts--;
                             isCritical = true;
                             headerString = "-1";
                             suffix = $" //! Unknown Message({prevHeader})";
@@ -438,6 +439,7 @@ namespace HabBit
                             {
                                 if (previousMessage.Class.QName.Name == similarMessage.Class.QName.Name)
                                 {
+                                    totalMatches++;
                                     suffix = (" // " + prevHeader);
                                     headerString = similarMessage.Id.ToString();
                                     break;
@@ -458,6 +460,7 @@ namespace HabBit
 
                                     if (previousClassRankTotal == similarClassRankTotal)
                                     {
+                                        totalMatches++;
                                         suffix = (" // " + prevHeader);
                                         headerString = similarMessage.Id.ToString();
                                         break;
@@ -467,6 +470,7 @@ namespace HabBit
                         }
                         else
                         {
+                            totalMatches++;
                             suffix = (" // " + prevHeader);
                             headerString = similarMessages[0].Id.ToString();
                         }
@@ -480,6 +484,7 @@ namespace HabBit
                     replaceOutput.WriteLine(line);
                 }
             }
+            Console.Write($" | Matches: {totalMatches}/{matchAttempts}");
         }
     }
 }
