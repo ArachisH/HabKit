@@ -157,7 +157,8 @@ namespace HabBit.Habbo
                         }
                         else name = $"local{(register - parameters.Count) + 1}";
 
-                        if (!nameIndices.TryGetValue(name, out int nameIndex))
+                        int nameIndex = -1;
+                        if (!nameIndices.TryGetValue(name, out nameIndex))
                         {
                             nameIndex = abc.Pool.AddConstant(name, false);
                             nameIndices.Add(name, nameIndex);
@@ -351,7 +352,8 @@ namespace HabBit.Habbo
             foreach (MessageItem message in OutMessages.Values.Concat(InMessages.Values))
             {
                 message.GenerateHash();
-                if (!Messages.TryGetValue(message.Hash, out List<MessageItem> group))
+                List<MessageItem> group = null;
+                if (!Messages.TryGetValue(message.Hash, out group))
                 {
                     group = new List<MessageItem>();
                     Messages.Add(message.Hash, group);
@@ -566,6 +568,58 @@ namespace HabBit.Habbo
         }
         #endregion
 
+        private bool InjectValueMiner()
+        {
+            throw new NotSupportedException();
+
+            ABCFile abc = ABCFiles.Last();
+            ASInstance decoderInstance = abc.GetFirstInstance("_-1l6");
+
+            var structureQName = new ASMultiname(abc.Pool);
+            structureQName.NameIndex = abc.Pool.AddConstant("structure");
+            structureQName.Kind = MultinameKind.QName;
+            structureQName.NamespaceIndex = 1; // Public
+
+            var structureSlot = new ASTrait(abc);
+            structureSlot.Kind = TraitKind.Slot;
+            structureSlot.QNameIndex = abc.Pool.AddConstant(structureQName);
+            structureSlot.TypeIndex = abc.Pool.GetMultinameIndices("Array").First();
+            decoderInstance.Traits.Add(structureSlot);
+
+            ASCode ctorCode = decoderInstance.Constructor.Body.ParseCode();
+            ctorCode.InsertRange(ctorCode.Count - 2, new ASInstruction[]
+            {
+                new GetLocal0Ins(),
+                new NewArrayIns(0),
+                new SetPropertyIns(abc) { PropertyNameIndex = structureSlot.QNameIndex }
+            });
+            decoderInstance.Constructor.Body.Code = ctorCode.ToArray();
+
+            var addTypeMethod = new ASMethod(abc);
+            addTypeMethod.ReturnTypeIndex = 2; // void
+            int addTypeMethodIndex = abc.AddMethod(addTypeMethod);
+
+            var valueParam = new ASParameter(abc, addTypeMethod);
+            valueParam.NameIndex = abc.Pool.AddConstant("value");
+            valueParam.TypeIndex = abc.Pool.GetMultinameIndices("Object").First();
+            addTypeMethod.Parameters.Add(valueParam);
+
+            var addTypeBody = new ASMethodBody(abc);
+            addTypeBody.MethodIndex = addTypeMethodIndex;
+            addTypeBody.InitialScopeDepth = 5;
+            addTypeBody.Code = new byte[0];
+            addTypeBody.MaxScopeDepth = 6;
+            addTypeBody.LocalCount = 10;
+            addTypeBody.MaxStack = 5;
+            abc.AddMethodBody(addTypeBody);
+
+            var addTypeCode = new ASCode(abc, addTypeBody);
+            addTypeBody.Code = addTypeCode.ToArray();
+
+            decoderInstance.AddMethod(addTypeMethod, "addType");
+            return true;
+        }
+
         public bool DisableHandshake()
         {
             if (!DisableEncryption()) return false;
@@ -650,7 +704,7 @@ namespace HabBit.Habbo
             }
             return DisableHostChanges();
         }
-        public bool InjectKeyShouter(int id)
+        public bool InjectKeyShouter(int messageId)
         {
             ABCFile abc = ABCFiles.Last();
             ASClass socketConnClass = abc.GetFirstClass("SocketConnection");
@@ -688,7 +742,7 @@ namespace HabBit.Habbo
             pubKeyVerCode.InsertRange(pubKeyVerCode.Count - 5, new ASInstruction[]
             {
                 new GetLocal2Ins(),
-                new PushIntIns(abc, id),
+                new PushIntIns(abc, messageId),
                 new GetLocalIns(6),
                 new CallPropVoidIns(abc) { PropertyNameIndex = sendFunction.QNameIndex, ArgCount = 2 }
             });
@@ -696,7 +750,7 @@ namespace HabBit.Habbo
             pubKeyVerifyMethod.Body.Code = pubKeyVerCode.ToArray();
             return true;
         }
-        public bool InjectLoopbackEndpoint(int port)
+        public bool InjectEndPoint(string host, int port)
         {
             ABCFile abc = ABCFiles.Last();
 
@@ -722,7 +776,7 @@ namespace HabBit.Habbo
             initMethod.Body.Code = code.ToArray();
             return true;
         }
-        public bool EnableDebugLogger(string functionName = null)
+        public bool InjectDebugLogger(string functionName)
         {
             ABCFile abc = ABCFiles[1];
 
@@ -750,9 +804,7 @@ namespace HabBit.Habbo
             var ifNotAvailable = new IfFalseIns() { Offset = 1 };
             ASInstruction jumpExit = code[code.IndexOf(OPCode.ReturnVoid)];
 
-            functionName = (functionName ?? "console.log");
             int functionNameIndex = abc.Pool.AddConstant(functionName, false);
-
             code.InsertRange(startIndex, new ASInstruction[]
             {
                 new GetLexIns(abc) { TypeNameIndex = externalInterfaceQNameIndex },
@@ -768,82 +820,6 @@ namespace HabBit.Habbo
             logMethod.Body.Code = code.ToArray();
 
             logMethod.Body.MaxStack += 3;
-            return true;
-        }
-        public bool InjectMessageLogger(string functionName = null)
-        {
-            ASClass coreClass = ABCFiles[1].GetFirstClass("Core");
-            if (coreClass == null) return false;
-
-            ASMethod debugMethod = coreClass.GetMethod(1, "debug", "void");
-            if (debugMethod == null) return false;
-
-            debugMethod.Flags |= MethodFlags.NeedRest;
-            debugMethod.Parameters.Clear();
-
-            ASCode debugCode = debugMethod.Body.ParseCode();
-            for (int i = 0; i < debugCode.Count; i++)
-            {
-                ASInstruction instruction = debugCode[i];
-                if (instruction.OP != OPCode.IfFalse) continue;
-
-                ASInstruction[] block = debugCode.GetJumpBlock((Jumper)instruction);
-                debugCode.RemoveRange((i - 1), (block.Length + 1));
-                break;
-            }
-
-            // 'FlashExternalInterface.logDebug' is the default internal function name.
-            if (!string.IsNullOrWhiteSpace(functionName))
-            {
-                int pushStringIndex = debugCode.IndexOf(OPCode.PushString);
-                var pushStringIns = (PushStringIns)debugCode[pushStringIndex];
-                pushStringIns.Value = functionName;
-            }
-            debugMethod.Body.Code = debugCode.ToArray();
-
-            ABCFile abc = ABCFiles.Last();
-            int coreQNameIndex = abc.Pool.GetMultinameIndices("Core").FirstOrDefault();
-            ASMultiname coreQName = abc.Pool.Multinames[coreQNameIndex];
-
-            int debugQNameIndex = abc.Pool.GetMultinameIndices("debug").FirstOrDefault();
-            ASMultiname debugQName = abc.Pool.Multinames[debugQNameIndex];
-
-            foreach (MessageItem message in OutMessages.Values)
-            {
-                ASInstance instance = message.Class.Instance;
-                ASMethod arrayMethod = instance.GetMethods(0, "Array").FirstOrDefault();
-                if (arrayMethod == null)
-                {
-                    if (instance.Super.Name != "Object")
-                    {
-                        instance = abc.GetFirstInstance(instance.Super.Name);
-                        arrayMethod = instance.GetMethods(0, "Array").FirstOrDefault();
-                    }
-                    if (arrayMethod == null) return false;
-                }
-
-                if (arrayMethod.Body.Exceptions.Count > 0) continue;
-                ASCode code = arrayMethod.Body.ParseCode();
-
-                int returnValIndex = code.IndexOf(OPCode.ReturnValue);
-                code.InsertRange(returnValIndex, new ASInstruction[]
-                {
-                    new DupIns(),
-                    new SetLocal1Ins()
-                });
-
-                returnValIndex += 2;
-                code.InsertRange(returnValIndex, new ASInstruction[]
-                {
-                    new GetLexIns(abc) { TypeNameIndex = coreQNameIndex },
-                    new GetLocal1Ins(),
-                    new CallPropVoidIns(abc) { ArgCount = 1, PropertyNameIndex = debugQNameIndex }
-                });
-
-                arrayMethod.Body.MaxStack += 3;
-                arrayMethod.Body.LocalCount += 1;
-                arrayMethod.Body.Code = code.ToArray();
-            }
             return true;
         }
         public bool ReplaceRSAKeys(string exponent, string modulus)
@@ -1561,7 +1537,8 @@ namespace HabBit.Habbo
                             classToCheck = classToCheck.GetABC().GetFirstClass(getLex.TypeName.Name);
                         }
 
-                        if (TryGetTraitTypeName(classToCheck, propertyName, out string propertyTypeName) ||
+                        string propertyTypeName = null;
+                        if (TryGetTraitTypeName(classToCheck, propertyName, out propertyTypeName) ||
                             TryGetTraitTypeName(classToCheck.Instance, propertyName, out propertyTypeName))
                         {
                             structure.Add(propertyTypeName);
@@ -1669,7 +1646,8 @@ namespace HabBit.Habbo
                     }
                     while (next.OP != OPCode.GetProperty && next.OP != OPCode.CallProperty);
 
-                    if (TryGetTraitTypeName(classToCheck, propertyName, out string propertyTypeName) ||
+                    string propertyTypeName = null;
+                    if (TryGetTraitTypeName(classToCheck, propertyName, out propertyTypeName) ||
                         TryGetTraitTypeName(classToCheck?.Instance, propertyName, out propertyTypeName))
                     {
                         structure.Add(propertyTypeName);
@@ -1707,7 +1685,8 @@ namespace HabBit.Habbo
                         classToCheck = classToCheck.GetABC().GetFirstClass(getLex.TypeName.Name);
                     }
 
-                    if (TryGetTraitTypeName(classToCheck, propertyName, out string propertyTypeName) ||
+                    string propertyTypeName = null;
+                    if (TryGetTraitTypeName(classToCheck, propertyName, out propertyTypeName) ||
                         TryGetTraitTypeName(classToCheck.Instance, propertyName, out propertyTypeName))
                     {
                         structure[--length] = propertyTypeName;
@@ -1730,8 +1709,9 @@ namespace HabBit.Habbo
                 ASInstruction instruction = code[i];
                 if (!Local.IsSetLocal(instruction.OP)) continue;
 
+                int structIndex = -1;
                 var local = (Local)instruction;
-                if (pushedLocals.TryGetValue(local.Register, out int structIndex))
+                if (pushedLocals.TryGetValue(local.Register, out structIndex))
                 {
                     ASInstruction beforeSet = code[i - 1];
                     pushedLocals.Remove(local.Register);
