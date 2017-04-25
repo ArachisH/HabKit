@@ -21,7 +21,11 @@ namespace HabBit.Commands
                 {
                     case "-p":
                     {
-                        Pattern = parameters.Dequeue();
+                        Pattern = parameters.Dequeue()
+                            .Replace(@"^<", @"<")
+                            .Replace(@"^^", @"^")
+                            .Replace(@"^>", @">");
+
                         break;
                     }
                     case "-mc":
