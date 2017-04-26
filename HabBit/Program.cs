@@ -72,32 +72,30 @@ namespace HabBit
 
         private void Run()
         {
-            if (Options.Actions.HasFlag(CommandActions.Fetch))
+            if (!string.IsNullOrWhiteSpace(Options.FetchRevision))
             {
                 ConsoleEx.WriteLineTitle("Fetching");
                 Fetch();
             }
-
-            bool isModifying = Options.Actions.HasFlag(CommandActions.Modify);
-            bool isExtracting = Options.Actions.HasFlag(CommandActions.Extract);
-            if (isModifying || isExtracting)
+            if (Options.Actions.HasFlag(CommandActions.Disassemble))
             {
                 ConsoleEx.WriteLineTitle("Disassembling");
                 Disassemble();
 
-
-                if (isModifying)
+                if (Options.Actions.HasFlag(CommandActions.Modify))
                 {
                     ConsoleEx.WriteLineTitle("Modifying");
                     Modify();
                 }
+
                 // Perform this right after modification, in case the '/clean', and '/dump' command combination is present.
-                if (isExtracting)
+                if (Options.Actions.HasFlag(CommandActions.Extract))
                 {
                     ConsoleEx.WriteLineTitle("Extracting");
                     Extract();
                 }
-                if (isModifying)
+
+                if (Options.Actions.HasFlag(CommandActions.Assemble))
                 {
                     ConsoleEx.WriteLineTitle("Assembling");
                     Assemble();
@@ -209,8 +207,7 @@ namespace HabBit
             if (Options.IsDumpingMessageData)
             {
                 string msgsPath = Path.Combine(Options.OutputDirectory, "Messages.txt");
-                using (var msgsStream = File.Open(msgsPath, FileMode.Create))
-                using (var msgsOutput = new StreamWriter(msgsStream))
+                using (var msgsOutput = new StreamWriter(msgsPath, false))
                 {
                     msgsOutput.WriteLine("// " + Game.Revision);
                     msgsOutput.WriteLine();
@@ -260,8 +257,7 @@ namespace HabBit
             if (Options.RSAInfo != null)
             {
                 string keysPath = Path.Combine(Options.OutputDirectory, "RSAKeys.txt");
-                using (var keysStream = File.Open(keysPath, FileMode.Create))
-                using (var keysOutput = new StreamWriter(keysStream))
+                using (var keysOutput = new StreamWriter(keysPath, false))
                 {
                     keysOutput.WriteLine("[E]Exponent: " + Options.RSAInfo.Exponent);
                     keysOutput.WriteLine("[N]Modulus: " + Options.RSAInfo.Modulus);
