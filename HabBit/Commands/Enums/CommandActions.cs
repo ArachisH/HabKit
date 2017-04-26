@@ -6,8 +6,10 @@ namespace HabBit.Commands
     public enum CommandActions
     {
         None = 0,
-        Fetch = 1,
-        Extract = 2,
-        Modify = 4
+
+        Disassemble = 1,
+        Assemble = (Disassemble | 2),
+        Extract = (Disassemble | 4),
+        Modify = (Disassemble | Assemble | 8)
     }
 }

@@ -32,8 +32,8 @@ namespace HabBit.Commands
             }
             else
             {
-                Exponent = parameters.Dequeue();
                 Modulus = parameters.Dequeue();
+                Exponent = parameters.Dequeue();
                 PrivateExponent = null;
             }
         }
