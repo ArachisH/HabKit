@@ -351,9 +351,8 @@ namespace HabBit.Habbo
             FindMessagesReferences();
             foreach (MessageItem message in OutMessages.Values.Concat(InMessages.Values))
             {
-                message.GenerateHash();
                 List<MessageItem> group = null;
-                if (!Messages.TryGetValue(message.Hash, out group))
+                if (!Messages.TryGetValue(message.GenerateHash(), out group))
                 {
                     group = new List<MessageItem>();
                     Messages.Add(message.Hash, group);
@@ -568,67 +567,14 @@ namespace HabBit.Habbo
         }
         #endregion
 
-        private bool InjectValueMiner()
-        {
-            throw new NotSupportedException();
-
-            ABCFile abc = ABCFiles.Last();
-            ASInstance decoderInstance = abc.GetFirstInstance("_-1l6");
-
-            var structureQName = new ASMultiname(abc.Pool);
-            structureQName.NameIndex = abc.Pool.AddConstant("structure");
-            structureQName.Kind = MultinameKind.QName;
-            structureQName.NamespaceIndex = 1; // Public
-
-            var structureSlot = new ASTrait(abc);
-            structureSlot.Kind = TraitKind.Slot;
-            structureSlot.QNameIndex = abc.Pool.AddConstant(structureQName);
-            structureSlot.TypeIndex = abc.Pool.GetMultinameIndices("Array").First();
-            decoderInstance.Traits.Add(structureSlot);
-
-            ASCode ctorCode = decoderInstance.Constructor.Body.ParseCode();
-            ctorCode.InsertRange(ctorCode.Count - 2, new ASInstruction[]
-            {
-                new GetLocal0Ins(),
-                new NewArrayIns(0),
-                new SetPropertyIns(abc) { PropertyNameIndex = structureSlot.QNameIndex }
-            });
-            decoderInstance.Constructor.Body.Code = ctorCode.ToArray();
-
-            var addTypeMethod = new ASMethod(abc);
-            addTypeMethod.ReturnTypeIndex = 2; // void
-            int addTypeMethodIndex = abc.AddMethod(addTypeMethod);
-
-            var valueParam = new ASParameter(abc, addTypeMethod);
-            valueParam.NameIndex = abc.Pool.AddConstant("value");
-            valueParam.TypeIndex = abc.Pool.GetMultinameIndices("Object").First();
-            addTypeMethod.Parameters.Add(valueParam);
-
-            var addTypeBody = new ASMethodBody(abc);
-            addTypeBody.MethodIndex = addTypeMethodIndex;
-            addTypeBody.InitialScopeDepth = 5;
-            addTypeBody.Code = new byte[0];
-            addTypeBody.MaxScopeDepth = 6;
-            addTypeBody.LocalCount = 10;
-            addTypeBody.MaxStack = 5;
-            abc.AddMethodBody(addTypeBody);
-
-            var addTypeCode = new ASCode(abc, addTypeBody);
-            addTypeBody.Code = addTypeCode.ToArray();
-
-            decoderInstance.AddMethod(addTypeMethod, "addType");
-            return true;
-        }
 
         public bool DisableHandshake()
         {
             if (!DisableEncryption()) return false;
-
             ABCFile abc = ABCFiles.Last();
 
-            ASClass habboCommDemoClass = abc.GetFirstClass("HabboCommunicationDemo");
-            if (habboCommDemoClass == null) return false;
-            ASInstance habboCommDemoInstance = habboCommDemoClass.Instance;
+            ASInstance habboCommDemoInstance = abc.GetFirstInstance("HabboCommunicationDemo");
+            if (habboCommDemoInstance == null) return false;
 
             int firstCoerceIndex = 0;
             ASCode initCryptoCode = null;
@@ -643,6 +589,7 @@ namespace HabBit.Habbo
                 {
                     initCryptoMethod = method;
                     initCryptoCode = method.Body.ParseCode();
+
                     firstCoerceIndex = initCryptoCode.IndexOf(OPCode.Coerce);
                     asInterfaceQNameIndex = ((CoerceIns)initCryptoCode[firstCoerceIndex]).TypeNameIndex;
                 }
@@ -704,21 +651,70 @@ namespace HabBit.Habbo
             }
             return DisableHostChanges();
         }
+        public bool InjectMessageLogger()
+        {
+            throw new NotSupportedException();
+
+            ABCFile abc = ABCFiles.Last();
+            ASInstance decoderInstance = abc.GetFirstInstance("_-1l6"); // TODO: Find the instance without a name.
+
+            var structureQName = new ASMultiname(abc.Pool);
+            structureQName.NameIndex = abc.Pool.AddConstant("structure");
+            structureQName.Kind = MultinameKind.QName;
+            structureQName.NamespaceIndex = 1; // Public
+
+            var structureSlot = new ASTrait(abc);
+            structureSlot.Kind = TraitKind.Slot;
+            structureSlot.QNameIndex = abc.Pool.AddConstant(structureQName);
+            structureSlot.TypeIndex = abc.Pool.GetMultinameIndices("Array").First();
+            decoderInstance.Traits.Add(structureSlot);
+
+            ASCode ctorCode = decoderInstance.Constructor.Body.ParseCode();
+            ctorCode.InsertRange(ctorCode.Count - 2, new ASInstruction[]
+            {
+                new GetLocal0Ins(),
+                new NewArrayIns(0),
+                new SetPropertyIns(abc) { PropertyNameIndex = structureSlot.QNameIndex }
+            });
+            decoderInstance.Constructor.Body.Code = ctorCode.ToArray();
+
+            var addTypeMethod = new ASMethod(abc);
+            addTypeMethod.ReturnTypeIndex = 2; // void
+            int addTypeMethodIndex = abc.AddMethod(addTypeMethod);
+
+            var valueParam = new ASParameter(abc, addTypeMethod);
+            valueParam.NameIndex = abc.Pool.AddConstant("value");
+            valueParam.TypeIndex = abc.Pool.GetMultinameIndices("Object").First();
+            addTypeMethod.Parameters.Add(valueParam);
+
+            var addTypeBody = new ASMethodBody(abc);
+            addTypeBody.MethodIndex = addTypeMethodIndex;
+            addTypeBody.InitialScopeDepth = 5;
+            addTypeBody.Code = new byte[0];
+            addTypeBody.MaxScopeDepth = 6;
+            addTypeBody.LocalCount = 10;
+            addTypeBody.MaxStack = 5;
+            abc.AddMethodBody(addTypeBody);
+
+            var addTypeCode = new ASCode(abc, addTypeBody);
+            addTypeBody.Code = addTypeCode.ToArray();
+
+            decoderInstance.AddMethod(addTypeMethod, "addType");
+            return true;
+        }
         public bool InjectKeyShouter(int messageId)
         {
             ABCFile abc = ABCFiles.Last();
-            ASClass socketConnClass = abc.GetFirstClass("SocketConnection");
-
-            if (socketConnClass == null) return false;
-            ASInstance socketConnInstance = socketConnClass.Instance;
+            ASInstance socketConnInstance = abc.GetFirstInstance("SocketConnection");
+            if (socketConnInstance == null) return false;
 
             ASTrait sendFunction = InjectUniversalSendFunction(true);
             if (sendFunction == null) return false;
 
-            ASClass habboCommDemoClass = abc.GetFirstClass("HabboCommunicationDemo");
-            if (habboCommDemoClass == null) return false;
-            ASInstance habboCommDemoInstance = habboCommDemoClass.Instance;
+            ASInstance habboCommDemoInstance = abc.GetFirstInstance("HabboCommunicationDemo");
+            if (habboCommDemoInstance == null) return false;
 
+            // TODO: Implement a more "dynamic" approach(scan each method for a pattern).
             ASMethod pubKeyVerifyMethod = habboCommDemoInstance.GetMethods(1, "void")
                 .Where(m => m.Body.MaxStack == 4 &&
                             m.Body.LocalCount == 10 &&
@@ -769,7 +765,7 @@ namespace HabBit.Habbo
                 var callPropVoid = (CallPropVoidIns)instruction;
                 if (callPropVoid.PropertyName.Name != "connect") continue;
 
-                code[i - 2] = new PushStringIns(abc, "127.0.0.1");
+                code[i - 2] = new PushStringIns(abc, host);
                 code[i - 1] = new PushIntIns(abc, port);
                 break;
             }
@@ -818,7 +814,6 @@ namespace HabBit.Habbo
 
             code.JumpExits[ifNotAvailable] = jumpExit;
             logMethod.Body.Code = code.ToArray();
-
             logMethod.Body.MaxStack += 3;
             return true;
         }
@@ -961,6 +956,9 @@ namespace HabBit.Habbo
                     sendCode.RemoveRange(0, i - 4);
                     int idNameIndex = abc.Pool.AddConstant("id");
                     int valuesNameIndex = abc.Pool.AddConstant("values");
+
+                    i = 0;
+                    isTrimming = false;
                     sendCode.InsertRange(0, new ASInstruction[]
                     {
                         new GetLocal0Ins(),
@@ -968,9 +966,6 @@ namespace HabBit.Habbo
                         new DebugIns(abc, idNameIndex, 1, 0),
                         new DebugIns(abc, valuesNameIndex, 1, 1)
                     });
-
-                    i = 0;
-                    isTrimming = false;
                 }
             }
         }
@@ -979,9 +974,8 @@ namespace HabBit.Habbo
             ABCFile abc = ABCFiles.Last();
             if (disableCrypto && !DisableEncryption()) return null;
 
-            ASClass socketConnClass = abc.GetFirstClass("SocketConnection");
-            if (socketConnClass == null) return null;
-            ASInstance socketConnInstance = socketConnClass.Instance;
+            ASInstance socketConnInstance = abc.GetFirstInstance("SocketConnection");
+            if (socketConnInstance == null) return null;
 
             ASMethod sendMethod = socketConnInstance.GetMethod(1, "send", "Boolean");
             if (sendMethod == null) return null;
@@ -1064,7 +1058,6 @@ namespace HabBit.Habbo
                 new GetLocalIns(encodedLocal),
                 new CallPropVoidIns(abc) { PropertyNameIndex = writeBytesIndex, ArgCount = 1 },
 
-
                 new GetLocal0Ins(),
                 new GetPropertyIns(abc) { PropertyNameIndex = socketSlot.QNameIndex },
                 new CallPropVoidIns(abc) { PropertyNameIndex = flushIndex },
@@ -1079,9 +1072,8 @@ namespace HabBit.Habbo
         {
             ABCFile abc = ABCFiles.Last();
 
-            ASClass habboCommMngrClass = abc.GetFirstClass("HabboCommunicationManager");
-            if (habboCommMngrClass == null) return false;
-            ASInstance habboCommMngrInstance = habboCommMngrClass.Instance;
+            ASInstance habboCommMngrInstance = abc.GetFirstInstance("HabboCommunicationManager");
+            if (habboCommMngrInstance == null) return false;
 
             ASTrait infoHostSlot = habboCommMngrInstance
                 .GetSlotTraits("String").FirstOrDefault();
@@ -1245,7 +1237,6 @@ namespace HabBit.Habbo
 
                         output.Write(reference.FromMethod);
 
-                        output.Write(reference.FromClass, true);
                         output.Write(reference.FromClass.Constructor);
                         output.Write(reference.FromClass.Instance.Constructor);
                     }

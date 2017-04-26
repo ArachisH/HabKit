@@ -17,7 +17,7 @@ namespace HabBit.Utilities
         public FileInfo GameInfo { get; set; }
         public CommandActions Actions { get; set; }
 
-        [Command("/c", CommandActions.Modify)]
+        [Command("/c", CommandActions.Assemble)]
         public CompressionKind? Compression { get; set; }
 
         [Command("/clean", CommandActions.Modify)]
@@ -38,7 +38,7 @@ namespace HabBit.Utilities
         [Command("/dump", CommandActions.Extract)]
         public bool IsDumpingMessageData { get; set; }
 
-        [Command("/fetch", CommandActions.Fetch, Default = "?")]
+        [Command("/fetch", CommandActions.None, Default = "?")]
         public string FetchRevision { get; set; }
 
         [Command("/hardep", CommandActions.Modify)]
