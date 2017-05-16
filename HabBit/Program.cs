@@ -169,12 +169,14 @@ namespace HabBit
                 Console.Write($"Injecting RC4 Key Shouter(Message ID: {Options.KeyShouterId})...");
                 Game.InjectKeyShouter((int)Options.KeyShouterId).WriteLineResult();
             }
-            else if (Options.IsDisablingHandshake)
+
+            if (Options.IsDisablingHandshake)
             {
                 Console.Write("Disabling Handshake...");
                 Game.DisableHandshake().WriteLineResult();
             }
-            else if (Options.RSAInfo != null)
+
+            if (Options.RSAInfo != null)
             {
                 Console.Write("Replacing RSA Keys...");
                 Game.ReplaceRSAKeys(Options.RSAInfo.Exponent, Options.RSAInfo.Modulus).WriteLineResult();
@@ -184,6 +186,12 @@ namespace HabBit
             {
                 Console.Write("Disabling Host Checks...");
                 Game.DisableHostChecks().WriteLineResult();
+            }
+
+            if (Options.IsInjectingRawCamera)
+            {
+                Console.Write("Injecting Raw Camera...");
+                Game.InjectRawCamera().WriteLineResult();
             }
 
             if (!string.IsNullOrWhiteSpace(Options.DebugLogger))

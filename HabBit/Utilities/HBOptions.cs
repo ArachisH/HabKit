@@ -56,6 +56,9 @@ namespace HabBit.Utilities
         [Command("/rsa", CommandActions.Modify)]
         public RSACommand RSAInfo { get; set; }
 
+        [Command("/rawcam", CommandActions.Modify)]
+        public bool IsInjectingRawCamera { get; set; }
+
         static HBOptions()
         {
             _commands = new Dictionary<string, PropertyInfo>();
