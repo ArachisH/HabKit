@@ -56,11 +56,5 @@
     <Compile Include="Utilities\ConsoleEx.cs" />
     <Compile Include="Utilities\HBOptions.cs" />
   </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\Submodules\Flazzy\Flazzy\Flazzy.csproj">
-      <Project>{84d3802e-16aa-4dd1-906c-3d4aee5ff8c6}</Project>
-      <Name>Flazzy</Name>
-    </ProjectReference>
-  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
