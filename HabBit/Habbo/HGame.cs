@@ -33,7 +33,8 @@ namespace HabBit.Habbo
             "try", "use", "var", "while", "with",
             "each", "null", "dynamic", "catch", "final",
             "break", "set", "static", "super", "include",
-            "return", "native", "function", "throw", "switch" };
+            "return", "native", "function", "throw", "switch",
+            "finally", "override" };
 
         private readonly Dictionary<DoABCTag, ABCFile> _abcFileTags;
         private readonly Dictionary<ASClass, MessageItem> _messages;
@@ -92,6 +93,10 @@ namespace HabBit.Habbo
 
         public void Sanitize(Sanitization sanitization)
         {
+            if (sanitization.HasFlag(Sanitization.IdentifierRename))
+            {
+                RenameIdentifiers();
+            }
             if (sanitization.HasFlag(Sanitization.Deobfuscate))
             {
                 Deobfuscate();
@@ -99,10 +104,6 @@ namespace HabBit.Habbo
             if (sanitization.HasFlag(Sanitization.RegisterRename))
             {
                 RenameRegisters();
-            }
-            if (sanitization.HasFlag(Sanitization.IdentifierRename))
-            {
-                RenameIdentifiers();
             }
         }
         #region Method Body Sanitization
@@ -131,7 +132,7 @@ namespace HabBit.Habbo
                 foreach (ASMethodBody body in abc.MethodBodies)
                 {
                     if (body.Exceptions.Count > 0) continue;
-                    if (body.Code.Length <= 50 && !body.Code.Contains((byte)0xEF)) continue;
+                    if (body.Code.Length <= 50 && !body.Code.Contains((byte)OPCode.Debug)) continue;
 
                     ASCode code = body.ParseCode();
                     if (!code.Contains(OPCode.Debug)) continue;
@@ -566,8 +567,175 @@ namespace HabBit.Habbo
             return references;
         }
         #endregion
+        
+        public bool InjectRawCamera()
+        {
+            // TODO: Try to split this up.
+            ABCFile abc = ABCFiles.Last();
+            ASInstance renderRoomInstance = abc.GetFirstInstance("RenderRoomMessageComposer");
+            if (renderRoomInstance == null) return false;
 
+            ASMethod isLessThan8100Method = renderRoomInstance.GetMethods(0, "Boolean").FirstOrDefault();
+            if (isLessThan8100Method == null) return false;
+            isLessThan8100Method.Body.Code[0] = (byte)OPCode.PushTrue;
+            isLessThan8100Method.Body.Code[1] = (byte)OPCode.ReturnValue;
 
+            ASMethod photoStringifierMethod = renderRoomInstance.GetMethods(0, "void").FirstOrDefault();
+            if (photoStringifierMethod == null) return false;
+            photoStringifierMethod.Body.Code[0] = (byte)OPCode.ReturnVoid;
+
+            var assignDataMethod = new ASMethod(abc);
+            assignDataMethod.ReturnTypeIndex = 2;
+            int assignDataMethodIndex = abc.AddMethod(assignDataMethod);
+
+            var bitmapParam = new ASParameter(abc, assignDataMethod);
+            bitmapParam.TypeIndex = abc.Pool.GetMultinameIndices("BitmapData").First();
+            assignDataMethod.Parameters.Add(bitmapParam);
+
+            var assignDataBody = new ASMethodBody(abc);
+            assignDataBody.MethodIndex = assignDataMethodIndex;
+            assignDataBody.InitialScopeDepth = 4;
+            assignDataBody.Code = new byte[0];
+            assignDataBody.MaxScopeDepth = 5;
+            assignDataBody.LocalCount = 3;
+            assignDataBody.MaxStack = 4;
+            abc.AddMethodBody(assignDataBody);
+            
+            ASTrait valuesArraySlot = renderRoomInstance.GetSlotTraits("Array").Last();
+            var assignDataCode = new ASCode(abc, assignDataBody);
+            assignDataCode.AddRange(new ASInstruction[]
+            {
+                new GetLocal0Ins(),
+                new PushScopeIns(),
+
+                new GetLexIns(abc, abc.Pool.GetMultinameIndex("PNGEncoder")),
+                new GetLocal1Ins(),
+                new CallPropertyIns(abc, abc.Pool.GetMultinameIndex("encode"), 1),
+                new CoerceIns(abc, abc.Pool.GetMultinameIndex("ByteArray")),
+                new SetLocal2Ins(),
+
+                new GetLocal0Ins(),
+                new GetLocal2Ins(),
+                new NewArrayIns(1),
+                new InitPropertyIns(abc, valuesArraySlot.QNameIndex),
+
+                new ReturnVoidIns()
+            });
+            assignDataBody.Code = assignDataCode.ToArray();
+            renderRoomInstance.AddMethod(assignDataMethod, "assignBitmap");
+
+            ASInstance smallCameraInstance = abc.GetFirstInstance("RoomThumbnailCameraWidget");
+            if (smallCameraInstance == null) return false;
+
+            ASTrait smallBitmapWindowSlot = smallCameraInstance.GetSlotTraits("IBitmapWrapperWindow").FirstOrDefault();
+            if (smallBitmapWindowSlot == null) return false;
+
+            ASMethod smallCaptureMethod = smallCameraInstance.GetMethods(2, "void")
+                .First(m => m.Parameters[0].Type.Name == "WindowEvent" &&
+                            m.Parameters[1].Type.Name == "IWindow");
+
+            ASCode captureClickEventCode = smallCaptureMethod.Body.ParseCode();
+            for (int i = 0; i < captureClickEventCode.Count; i++)
+            {
+                ASInstruction instruction = captureClickEventCode[i];
+                if (instruction.OP != OPCode.GetLocal) continue;
+
+                var getLocal = (GetLocalIns)instruction;
+                if (getLocal.Register != 4) continue;
+
+                instruction = captureClickEventCode[i - 1];
+                if (instruction.OP != OPCode.GetProperty) continue;
+
+                var getProperty = (GetPropertyIns)instruction;
+                if (getProperty.PropertyName.Name != "handler") continue;
+
+                captureClickEventCode.InsertRange(i - 2, new ASInstruction[]
+                {
+                    // local4.assignBitmap(this.smallBitmapWindowSlot.bitmap);
+                    new GetLocalIns(4),
+                    new GetLocal0Ins(),
+                    new GetPropertyIns(abc, smallBitmapWindowSlot.QNameIndex),
+                    new GetPropertyIns(abc, abc.Pool.GetMultinameIndex("bitmap")),
+                    new CallPropVoidIns(abc, abc.Pool.GetMultinameIndex("assignBitmap"), 1)
+                });
+                break;
+            }
+            smallCaptureMethod.Body.Code = captureClickEventCode.ToArray();
+
+            ASInstance photoLabInstance = abc.GetFirstInstance("CameraPhotoLab");
+            if (photoLabInstance == null) return false;
+
+            ASTrait bigBitmapWindowSlot = photoLabInstance.GetSlotTraits("IBitmapWrapperWindow").FirstOrDefault();
+            if (bigBitmapWindowSlot == null) return false;
+
+            ASMethod bigPurchaseMethod = photoLabInstance.GetMethods(1, "void")
+                .First(m => m.Parameters[0].Type.Name == "MouseEvent");
+
+            string dataSendTraitName = null;
+            int cameraHandlerSlotNameIndex = -1;
+            ASCode bigPurchaseCode = bigPurchaseMethod.Body.ParseCode();
+            for (int i = 0; i < bigPurchaseCode.Count; i++)
+            {
+                ASInstruction instruction = bigPurchaseCode[i];
+                if (instruction.OP != OPCode.ConstructProp) continue;
+
+                var constructProp = (ConstructPropIns)instruction;
+                if (constructProp.ArgCount != 2) continue;
+
+                var getProperty = (bigPurchaseCode[i + 4] as GetPropertyIns);
+                if (getProperty == null) return false;
+                cameraHandlerSlotNameIndex = getProperty.PropertyNameIndex;
+
+                bigPurchaseCode.InsertRange(i + 5, new ASInstruction[]
+                {
+                    // this.bigBitmapWindowSlot.bitmap
+                    new GetLocal0Ins(),
+                    new GetPropertyIns(abc, bigBitmapWindowSlot.QNameIndex),
+                    new GetPropertyIns(abc, abc.Pool.GetMultinameIndex("bitmap"))
+                });
+
+                var callProperty = (bigPurchaseCode[i + 8] as CallPropertyIns);
+                if (callProperty == null) return false;
+                dataSendTraitName = callProperty.PropertyName.Name;
+                callProperty.ArgCount = 1;
+                break;
+            }
+            bigPurchaseMethod.Body.Code = bigPurchaseCode.ToArray();
+
+            ASInstance bigCameraHandlerInstance = photoLabInstance.GetTraits(TraitKind.Slot)
+                .Select(t => abc.GetFirstInstance(t.Type.Name))
+                .FirstOrDefault();
+            if (bigCameraHandlerInstance == null) return false;
+
+            ASMethod dataSendMethod = bigCameraHandlerInstance.GetMethod(0, dataSendTraitName, "Boolean");
+            if (dataSendMethod == null) return false;
+
+            var bitmapDataParam = new ASParameter(abc, dataSendMethod);
+            bitmapDataParam.TypeIndex = abc.Pool.GetMultinameIndex("BitmapData");
+            dataSendMethod.Parameters.Add(bitmapDataParam);
+
+            ASCode dataSendCode = dataSendMethod.Body.ParseCode();
+            ShiftRegistersBy(dataSendCode, 1);
+
+            for (int i = 0; i < dataSendCode.Count; i++)
+            {
+                ASInstruction instruction = dataSendCode[i];
+                if (instruction.OP != OPCode.SetLocal_2) continue;
+
+                dataSendCode.InsertRange(i + 1, new ASInstruction[]
+                {
+                    new GetLocal2Ins(),
+                    new GetLocal1Ins(),
+                    new CallPropVoidIns(abc, abc.Pool.GetMultinameIndex("assignBitmap"), 1)
+                });
+                break;
+            }
+
+            dataSendMethod.Body.MaxStack += 1;
+            dataSendMethod.Body.LocalCount += 1;
+            dataSendMethod.Body.Code = dataSendCode.ToArray();
+            return true;
+        }
         public bool DisableHandshake()
         {
             if (!DisableEncryption()) return false;
@@ -601,11 +769,7 @@ namespace HabBit.Habbo
                     {
                         new GetLocal0Ins(),
                         new GetLocal2Ins(),
-                        new CallPropVoidIns(abc)
-                        {
-                            ArgCount = 1,
-                            PropertyNameIndex = method.Trait.QNameIndex
-                        }
+                        new CallPropVoidIns(abc, method.Trait.QNameIndex, 1)
                     });
                     initCryptoMethod.Body.Code = initCryptoCode.ToArray();
                     return true;
@@ -615,18 +779,14 @@ namespace HabBit.Habbo
         }
         public bool DisableHostChecks()
         {
-            ASMethod localHostCheckMethod = ABCFiles[0].Classes[0]
-                .GetMethods(1, "Boolean").FirstOrDefault();
-
+            ASMethod localHostCheckMethod = ABCFiles[0].Classes[0].GetMethods(1, "Boolean").FirstOrDefault();
             if (localHostCheckMethod == null) return false;
-            var hostCheckMethods = new List<ASMethod>
-            {
-                localHostCheckMethod
-            };
 
-            ASClass habboClass = ABCFiles[1].GetFirstClass("Habbo");
-            if (habboClass == null) return false;
-            ASInstance habboInstance = habboClass.Instance;
+            localHostCheckMethod.Body.Code[0] = (byte)OPCode.PushTrue;
+            localHostCheckMethod.Body.Code[1] = (byte)OPCode.ReturnValue;
+
+            ASInstance habboInstance = ABCFiles[1].GetFirstInstance("Habbo");
+            if (habboInstance == null) return false;
 
             ASMethod remoteHostCheckMethod = habboInstance.GetMethods(2, "Boolean")
                 .Where(m => m.Parameters[0].Type.Name == "String" &&
@@ -634,21 +794,9 @@ namespace HabBit.Habbo
                 .FirstOrDefault();
 
             if (remoteHostCheckMethod == null) return false;
-            hostCheckMethods.Add(remoteHostCheckMethod);
+            remoteHostCheckMethod.Body.Code[0] = (byte)OPCode.PushTrue;
+            remoteHostCheckMethod.Body.Code[1] = (byte)OPCode.ReturnValue;
 
-            foreach (ASMethod method in hostCheckMethods)
-            {
-                ASCode code = method.Body.ParseCode();
-                if (!code.StartsWith(OPCode.PushTrue, OPCode.ReturnValue))
-                {
-                    code.InsertRange(0, new ASInstruction[]
-                    {
-                        new PushTrueIns(),
-                        new ReturnValueIns()
-                    });
-                    method.Body.Code = code.ToArray();
-                }
-            }
             return DisableHostChanges();
         }
         public bool InjectMessageLogger()
@@ -737,10 +885,11 @@ namespace HabBit.Habbo
             }
             pubKeyVerCode.InsertRange(pubKeyVerCode.Count - 5, new ASInstruction[]
             {
+                // local2.sendMessage({messageId}, local6);
                 new GetLocal2Ins(),
                 new PushIntIns(abc, messageId),
                 new GetLocalIns(6),
-                new CallPropVoidIns(abc) { PropertyNameIndex = sendFunction.QNameIndex, ArgCount = 2 }
+                new CallPropVoidIns(abc, sendFunction.QNameIndex, 2)
             });
 
             pubKeyVerifyMethod.Body.Code = pubKeyVerCode.ToArray();
@@ -780,19 +929,11 @@ namespace HabBit.Habbo
             foreach (ASClass @class in abc.Classes)
             {
                 if (@class.Traits.Count != 2) continue;
+
                 logMethod = @class.GetMethod(0, "log", "void");
                 if (logMethod != null) break;
             }
             if (logMethod == null) return false;
-
-            int externalInterfaceQNameIndex = abc.Pool.GetMultinameIndices("ExternalInterface").FirstOrDefault();
-            if (externalInterfaceQNameIndex == 0) return false;
-
-            int availableQNameIndex = abc.Pool.GetMultinameIndices("available").FirstOrDefault();
-            if (availableQNameIndex == 0) return false;
-
-            int callQNameIndex = abc.Pool.GetMultinameIndices("call").FirstOrDefault();
-            if (callQNameIndex == 0) return false;
 
             ASCode code = logMethod.Body.ParseCode();
             int startIndex = (code.IndexOf(OPCode.PushScope) + 1);
@@ -800,16 +941,21 @@ namespace HabBit.Habbo
             var ifNotAvailable = new IfFalseIns() { Offset = 1 };
             ASInstruction jumpExit = code[code.IndexOf(OPCode.ReturnVoid)];
 
-            int functionNameIndex = abc.Pool.AddConstant(functionName, false);
             code.InsertRange(startIndex, new ASInstruction[]
             {
-                new GetLexIns(abc) { TypeNameIndex = externalInterfaceQNameIndex },
-                new GetPropertyIns(abc) { PropertyNameIndex = availableQNameIndex },
+                /*
+                 * if(ExternalInterface.available)
+                 * {
+                 *     ExternalInterface.call({functionName});
+                 * }
+                 */
+                new GetLexIns(abc, abc.Pool.GetMultinameIndex("ExternalInterface")),
+                new GetPropertyIns(abc, abc.Pool.GetMultinameIndex("available")),
                 ifNotAvailable,
-                new GetLexIns(abc) { TypeNameIndex = externalInterfaceQNameIndex },
-                new PushStringIns(abc, functionNameIndex),
+                new GetLexIns(abc, abc.Pool.GetMultinameIndex("ExternalInterface")),
+                new PushStringIns(abc, functionName),
                 new GetLocal1Ins(),
-                new CallPropVoidIns(abc) { ArgCount = 2, PropertyNameIndex = callQNameIndex }
+                new CallPropVoidIns(abc, abc.Pool.GetMultinameIndex("call"), 2)
             });
 
             code.JumpExits[ifNotAvailable] = jumpExit;
@@ -849,10 +995,6 @@ namespace HabBit.Habbo
                 }
 
                 ASCode code = method.Body.ParseCode();
-                if (code.StartsWith(OPCode.PushString, OPCode.ReturnValue))
-                {
-                    code.RemoveRange(0, 2);
-                }
                 code.InsertRange(0, new ASInstruction[]
                 {
                         new PushStringIns(abc, keyIndex),
@@ -874,21 +1016,24 @@ namespace HabBit.Habbo
                 {
                     if (@class.Traits.Count != 2) continue;
                     if (@class.Instance.Traits.Count != 3) continue;
+
                     habboMessagesClass = @class;
                     break;
                 }
+                if (habboMessagesClass == null) return;
             }
 
             ASCode code = habboMessagesClass.Constructor.Body.ParseCode();
             int inMapTypeIndex = habboMessagesClass.Traits[0].QNameIndex;
             int outMapTypeIndex = habboMessagesClass.Traits[1].QNameIndex;
 
-            List<ASInstruction> instructions = code
+            ASInstruction[] instructions = code
                 .Where(i => i.OP == OPCode.GetLex ||
                             i.OP == OPCode.PushShort ||
-                            i.OP == OPCode.PushByte).ToList();
+                            i.OP == OPCode.PushByte)
+                .ToArray();
 
-            for (int i = 0; i < instructions.Count; i += 3)
+            for (int i = 0; i < instructions.Length; i += 3)
             {
                 var getLexInst = (instructions[i + 0] as GetLexIns);
                 bool isOutgoing = (getLexInst.TypeNameIndex == outMapTypeIndex);
@@ -950,6 +1095,7 @@ namespace HabBit.Habbo
                 else if (isTrimming)
                 {
                     if (instruction.OP != OPCode.CallProperty) continue;
+
                     var callProperty = (CallPropertyIns)instruction;
                     if (callProperty.PropertyName.Name != "encode") continue;
 
@@ -994,7 +1140,7 @@ namespace HabBit.Habbo
             // The parameters for the instructions to expect / use.
             var idParam = new ASParameter(abc, sendMessageMethod);
             idParam.NameIndex = abc.Pool.AddConstant("id");
-            idParam.TypeIndex = abc.Pool.GetMultinameIndices("int").First();
+            idParam.TypeIndex = abc.Pool.GetMultinameIndex("int");
             sendMessageMethod.Parameters.Add(idParam);
 
             // The method body that houses the instructions.
@@ -1013,9 +1159,10 @@ namespace HabBit.Habbo
 
         private bool DisableEncryption()
         {
-            ASClass socketConnClass = ABCFiles.Last().GetFirstClass("SocketConnection");
-            if (socketConnClass == null) return false;
-            ASInstance socketConnInstance = socketConnClass.Instance;
+            ABCFile abc = ABCFiles.Last();
+
+            ASInstance socketConnInstance = abc.GetFirstInstance("SocketConnection");
+            if (socketConnInstance == null) return false;
 
             ASMethod sendMethod = socketConnInstance.GetMethod(1, "send", "Boolean");
             if (sendMethod == null) return false;
@@ -1043,24 +1190,17 @@ namespace HabBit.Habbo
                 break;
             }
             if (encodedLocal == -1) return false;
-            ABCFile abc = socketConnInstance.GetABC();
-
-            int flushIndex = abc.Pool.GetMultinameIndices("flush").First();
-            if (flushIndex == 0) return false;
-
-            int writeBytesIndex = abc.Pool.GetMultinameIndices("writeBytes").First();
-            if (writeBytesIndex == 0) return false;
 
             sendCode.AddRange(new ASInstruction[]
             {
                 new GetLocal0Ins(),
-                new GetPropertyIns(abc) { PropertyNameIndex = socketSlot.QNameIndex },
+                new GetPropertyIns(abc, socketSlot.QNameIndex),
                 new GetLocalIns(encodedLocal),
-                new CallPropVoidIns(abc) { PropertyNameIndex = writeBytesIndex, ArgCount = 1 },
+                new CallPropVoidIns(abc, abc.Pool.GetMultinameIndex("writeBytes"), 1),
 
                 new GetLocal0Ins(),
-                new GetPropertyIns(abc) { PropertyNameIndex = socketSlot.QNameIndex },
-                new CallPropVoidIns(abc) { PropertyNameIndex = flushIndex },
+                new GetPropertyIns(abc, socketSlot.QNameIndex),
+                new CallPropVoidIns(abc, abc.Pool.GetMultinameIndex("flush")),
 
                 new PushTrueIns(),
                 new ReturnValueIns()
@@ -1075,16 +1215,10 @@ namespace HabBit.Habbo
             ASInstance habboCommMngrInstance = abc.GetFirstInstance("HabboCommunicationManager");
             if (habboCommMngrInstance == null) return false;
 
-            ASTrait infoHostSlot = habboCommMngrInstance
-                .GetSlotTraits("String").FirstOrDefault();
+            ASTrait infoHostSlot = habboCommMngrInstance.GetSlotTraits("String").FirstOrDefault();
             if (infoHostSlot == null) return false;
 
-            int getPropertyNameIndex = abc.Pool
-                .GetMultinameIndices("getProperty").FirstOrDefault();
-            if (getPropertyNameIndex == 0) return false;
-
-            ASMethod initComponentMethod =
-                habboCommMngrInstance.GetMethod(0, "initComponent", "void");
+            ASMethod initComponentMethod = habboCommMngrInstance.GetMethod(0, "initComponent", "void");
             if (initComponentMethod == null) return false;
 
             string connectMethodName = string.Empty;
@@ -1100,20 +1234,18 @@ namespace HabBit.Habbo
             }
             if (string.IsNullOrWhiteSpace(connectMethodName)) return false;
 
-            ASMethod connectMethod = habboCommMngrInstance
-                .GetMethod(0, connectMethodName, "void");
+            ASMethod connectMethod = habboCommMngrInstance.GetMethod(0, connectMethodName, "void");
             if (connectMethod == null) return false;
 
             ASCode connectCode = connectMethod.Body.ParseCode();
             connectCode.InsertRange(4, new ASInstruction[]
             {
+                // this.infoHost = getProperty("connection.info.host");
                 new GetLocal0Ins(),
-                new FindPropStrictIns(abc, getPropertyNameIndex),
+                new FindPropStrictIns(abc, abc.Pool.GetMultinameIndex("getProperty")),
                 new PushStringIns(abc, "connection.info.host"),
-                new CallPropertyIns(abc, getPropertyNameIndex, 1),
+                new CallPropertyIns(abc, abc.Pool.GetMultinameIndex("getProperty"), 1),
                 new InitPropertyIns(abc, infoHostSlot.QNameIndex)
-                // Inserts: this.Slot = getProperty("connection.info.host");
-                // This portion ensures the host slot value stays vanilla(no prefixes/changes).
             });
 
             // This portion prevents any suffix from being added to the host slot.
@@ -1127,6 +1259,25 @@ namespace HabBit.Habbo
             }
             connectMethod.Body.Code = connectCode.ToArray();
             return true;
+        }
+        private void ShiftRegistersBy(ASCode code, int offset)
+        {
+            for (int i = 0; i < code.Count; i++)
+            {
+                ASInstruction instruction = code[i];
+                if (!Local.IsValid(instruction.OP)) continue;
+                if (instruction.OP == OPCode.GetLocal_0) continue;
+
+                var local = (Local)instruction;
+                if (Local.IsGetLocal(instruction.OP))
+                {
+                    code[i] = Local.CreateGet(local.Register + offset);
+                }
+                else if (Local.IsSetLocal(instruction.OP))
+                {
+                    code[i] = Local.CreateSet(local.Register + offset);
+                }
+            }
         }
 
         public override void Disassemble(Action<TagItem> callback)
@@ -1253,6 +1404,33 @@ namespace HabBit.Habbo
         {
             return References.Any(r => r.FromMethod == method);
         }
+        public int GetMatchPoints(MessageItem toCompare)
+        {
+            // TODO: Finish this.
+            if (IsOutgoing != toCompare.IsOutgoing) return 0;
+            if (toCompare.References.Count != References.Count) return 0;
+
+            int points = 0;
+            if (Structure != null && toCompare.Structure != null)
+            {
+                points++;
+
+                int maxStructSizePts = Math.Max(Structure.Length, toCompare.Structure.Length);
+                points += (maxStructSizePts - GetDifference(Structure.Length, toCompare.Structure.Length));
+
+                // You gotta love linq.
+                Dictionary<string, int> typeCounts = Structure.Distinct()
+                    .ToDictionary(t => t, t => Structure.Count(t2 => t2 == t));
+
+                foreach (KeyValuePair<string, int> pair in typeCounts)
+                {
+                    int count = toCompare.Structure.Count(s => s == pair.Key);
+                    points += (pair.Value - GetDifference(pair.Value, count));
+                }
+            }
+
+            return points;
+        }
 
         private ASClass GetMessageParser()
         {
@@ -1295,6 +1473,10 @@ namespace HabBit.Habbo
                 }
             }
             return null;
+        }
+        private int GetDifference(int a, int b)
+        {
+            return Math.Abs(a - b);
         }
 
         #region Structure Extraction
