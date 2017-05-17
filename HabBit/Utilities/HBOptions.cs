@@ -3,6 +3,7 @@ using System.IO;
 using System.Reflection;
 using System.Collections.Generic;
 
+using HabBit.Habbo;
 using HabBit.Commands;
 
 using Flazzy;
@@ -21,7 +22,7 @@ namespace HabBit.Utilities
         public CompressionKind? Compression { get; set; }
 
         [Command("/clean", CommandActions.Modify)]
-        public bool IsSanitizing { get; set; }
+        public CleanCommand CleanInfo { get; set; }
 
         [Command("/dcrypto", CommandActions.Modify)]
         public bool IsDisablingHandshake { get; set; }

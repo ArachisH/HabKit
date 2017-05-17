@@ -14,14 +14,13 @@ using Flazzy.ABC.AVM2.Instructions;
 
 namespace HabBit.Habbo
 {
-    public enum Sanitization
+    [Flags]
+    public enum GSanitizations
     {
         None = 0,
         Deobfuscate = 1,
         RegisterRename = 2,
-        IdentifierRename = 4,
-
-        All = (Deobfuscate | RegisterRename | IdentifierRename)
+        IdentifierRename = 4
     }
 
     public class HGame : ShockwaveFlash
@@ -91,22 +90,22 @@ namespace HabBit.Habbo
             Messages = new SortedDictionary<string, List<MessageItem>>();
         }
 
-        public void Sanitize(Sanitization sanitization)
+        public void Sanitize(GSanitizations sanitizations)
         {
-            if (sanitization.HasFlag(Sanitization.IdentifierRename))
+            if (sanitizations.HasFlag(GSanitizations.IdentifierRename))
             {
                 RenameIdentifiers();
             }
-            if (sanitization.HasFlag(Sanitization.Deobfuscate))
+            if (sanitizations.HasFlag(GSanitizations.Deobfuscate))
             {
                 Deobfuscate();
             }
-            if (sanitization.HasFlag(Sanitization.RegisterRename))
+            if (sanitizations.HasFlag(GSanitizations.RegisterRename))
             {
                 RenameRegisters();
             }
         }
-        #region Method Body Sanitization
+        #region Sanitization
         protected void Deobfuscate()
         {
             foreach (ABCFile abc in ABCFiles)
