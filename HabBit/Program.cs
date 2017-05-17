@@ -151,10 +151,10 @@ namespace HabBit
         }
         private void Modify()
         {
-            if (Options.IsSanitizing)
+            if (Options.CleanInfo != null)
             {
-                Console.Write("Sanitizing...");
-                Game.Sanitize(Sanitization.All);
+                Console.Write($"Sanitizing({Options.CleanInfo.Sanitizations})...");
+                Game.Sanitize(Options.CleanInfo.Sanitizations);
                 ConsoleEx.WriteLineFinished();
             }
 
