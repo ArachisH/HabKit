@@ -188,6 +188,18 @@ namespace HabBit
                 Game.DisableHostChecks().WriteLineResult();
             }
 
+            if (Options.IsEnablingAvatarTags)
+            {
+                Console.Write("Enabling Avatar Tags...");
+                Game.EnableAvatarTags().WriteLineResult();
+            }
+
+            if (Options.IsEnablingDescriptions)
+            {
+                Console.Write("Enabling Badge Descriptions...");
+                Game.EnableDescriptions().WriteLineResult();
+            }
+
             if (Options.IsInjectingRawCamera)
             {
                 Console.Write("Injecting Raw Camera...");
@@ -198,6 +210,12 @@ namespace HabBit
             {
                 Console.Write($"Injecting Debug Logger(\"{Options.DebugLogger}\")...");
                 Game.InjectDebugLogger(Options.DebugLogger).WriteLineResult();
+            }
+
+            if (!string.IsNullOrWhiteSpace(Options.MessageLogger))
+            {
+                Console.Write($"Injecting Message Logger(\"{Options.MessageLogger}\")...");
+                Game.InjectMessageLogger(Options.MessageLogger).WriteLineResult();
             }
 
             if (!string.IsNullOrWhiteSpace(Options.Revision))
