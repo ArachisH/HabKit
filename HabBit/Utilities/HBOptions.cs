@@ -36,6 +36,9 @@ namespace HabBit.Utilities
         [Command("/dlog", CommandActions.Modify, Default = "console.log")]
         public string DebugLogger { get; set; }
 
+        [Command("/mlog", CommandActions.Modify, Default = "console.log")]
+        public string MessageLogger { get; set; }
+
         [Command("/dump", CommandActions.Extract)]
         public bool IsDumpingMessageData { get; set; }
 
@@ -59,6 +62,12 @@ namespace HabBit.Utilities
 
         [Command("/rawcam", CommandActions.Modify)]
         public bool IsInjectingRawCamera { get; set; }
+
+        [Command("/desc", CommandActions.Modify)]
+        public bool IsEnablingDescriptions { get; set; }
+
+        [Command("/avtags", CommandActions.Modify)]
+        public bool IsEnablingAvatarTags { get; set; }
 
         static HBOptions()
         {
