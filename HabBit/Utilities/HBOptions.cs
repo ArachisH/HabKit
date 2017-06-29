@@ -18,7 +18,7 @@ namespace HabBit.Utilities
         public FileInfo GameInfo { get; set; }
         public CommandActions Actions { get; set; }
 
-        [Command("/c", CommandActions.Assemble)]
+        [Command("/c", CommandActions.Assemble, MinParams = 1)]
         public CompressionKind? Compression { get; set; }
 
         [Command("/clean", CommandActions.Modify)]
@@ -30,7 +30,7 @@ namespace HabBit.Utilities
         [Command("/dhost", CommandActions.Modify)]
         public bool IsDisablingHostChecks { get; set; }
 
-        [Command("/dir", CommandActions.None)]
+        [Command("/dir", CommandActions.None, MinParams = 1)]
         public string OutputDirectory { get; set; }
 
         [Command("/dlog", CommandActions.Modify, Default = "console.log")]
@@ -45,19 +45,19 @@ namespace HabBit.Utilities
         [Command("/fetch", CommandActions.None, Default = "?")]
         public string FetchRevision { get; set; }
 
-        [Command("/hardep", CommandActions.Modify)]
+        [Command("/hardep", CommandActions.Modify, MinParams = 1)]
         public HardEPCommand HardEPInfo { get; set; }
 
         [Command("/kshout", CommandActions.Modify, Default = 4001)]
         public int? KeyShouterId { get; set; }
 
-        [Command("/match", CommandActions.Extract)]
+        [Command("/match", CommandActions.Extract, MinParams = 3)]
         public MatchCommand MatchInfo { get; set; }
 
-        [Command("/rev", CommandActions.Modify)]
+        [Command("/rev", CommandActions.Modify, MinParams = 1)]
         public string Revision { get; set; }
 
-        [Command("/rsa", CommandActions.Modify)]
+        [Command("/rsa", CommandActions.Modify, MinParams = 1)]
         public RSACommand RSAInfo { get; set; }
 
         [Command("/rawcam", CommandActions.Modify)]
@@ -68,6 +68,12 @@ namespace HabBit.Utilities
 
         [Command("/avtags", CommandActions.Modify)]
         public bool IsEnablingAvatarTags { get; set; }
+
+        [Command("/binrep", CommandActions.Modify, MinParams = 2)]
+        public BinRepCommand BinRepInfo { get; set; }
+
+        [Command("/eep", CommandActions.Extract)]
+        public bool IsExtractingEndPoint { get; set; }
 
         static HBOptions()
         {
@@ -110,6 +116,10 @@ namespace HabBit.Utilities
                 if (_commands.TryGetValue(command, out property))
                 {
                     CommandAttribute commandAtt = _attributes[property];
+                    if (parameters.Count < commandAtt.MinParams)
+                    {
+                        throw new Exception($"Insufficient amount of parameters provided for the command '{command}', where the minimum required is '{commandAtt.MinParams}'.");
+                    }
                     options.Actions |= commandAtt.Actions;
 
                     object value = null;
