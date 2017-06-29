@@ -44,6 +44,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Commands\BinRepCommand.cs" />
     <Compile Include="Commands\CleanCommand.cs" />
     <Compile Include="Commands\Command.cs" />
     <Compile Include="Commands\Enums\CommandActions.cs" />
