@@ -151,6 +151,32 @@ namespace HabBit
         }
         private void Modify()
         {
+            if (Options.BinRepInfo != null)
+            {
+                var toReplaceIds = string.Join(", ",
+                    Options.BinRepInfo.Replacements.Keys.Select(k => k.ToString()));
+
+                Console.Write($"Replacing Binary Data({toReplaceIds})...");
+                foreach (DefineBinaryDataTag defBinData in Game.Tags
+                    .Where(t => t.Kind == TagKind.DefineBinaryData))
+                {
+                    byte[] data = null;
+                    if (Options.BinRepInfo.Replacements.TryGetValue(defBinData.Id, out data))
+                    {
+                        defBinData.Data = data;
+                        Options.BinRepInfo.Replacements.Remove(defBinData.Id);
+                    }
+                }
+                if (Options.BinRepInfo.Replacements.Count > 0)
+                {
+                    var failedReplaceIds = string.Join(", ",
+                        Options.BinRepInfo.Replacements.Keys.Select(k => k.ToString()));
+
+                    Console.Write($" | Data Replace Failed: Ids({failedReplaceIds})");
+                }
+                ConsoleEx.WriteLineFinished();
+            }
+
             if (Options.CleanInfo != null)
             {
                 Console.Write($"Sanitizing({Options.CleanInfo.Sanitizations})...");
@@ -226,9 +252,25 @@ namespace HabBit
         }
         private void Extract()
         {
-            Console.Write("Generating Message Hashes...");
-            Game.GenerateMessageHashes();
-            ConsoleEx.WriteLineFinished();
+            if (Options.IsDumpingMessageData || Options.MatchInfo != null)
+            {
+                Console.Write("Generating Message Hashes...");
+                Game.GenerateMessageHashes();
+                ConsoleEx.WriteLineFinished();
+            }
+
+            if (Options.IsExtractingEndPoint)
+            {
+                Console.Write("Extracting End Point...");
+                Tuple<string, int?> endPoint = Game.ExtractEndPoint();
+
+                string endPointPath = Path.Combine(Options.OutputDirectory, "EndPoint.txt");
+                using (var endPointOutput = new StreamWriter(endPointPath, false))
+                {
+                    endPointOutput.Write($"{endPoint.Item1}:{endPoint.Item2}");
+                }
+                ConsoleEx.WriteLineFinished();
+            }
 
             if (Options.IsDumpingMessageData)
             {
