@@ -15,7 +15,7 @@ using Flazzy.ABC.AVM2.Instructions;
 namespace HabBit.Habbo
 {
     [Flags]
-    public enum GSanitizations
+    public enum Sanitizers
     {
         None = 0,
         Deobfuscate = 1,
@@ -102,17 +102,17 @@ namespace HabBit.Habbo
             Messages = new SortedDictionary<string, List<MessageItem>>();
         }
 
-        public void Sanitize(GSanitizations sanitizations)
+        public void Sanitize(Sanitizers sanitizations)
         {
-            if (sanitizations.HasFlag(GSanitizations.IdentifierRename))
+            if (sanitizations.HasFlag(Sanitizers.IdentifierRename))
             {
                 RenameIdentifiers();
             }
-            if (sanitizations.HasFlag(GSanitizations.Deobfuscate))
+            if (sanitizations.HasFlag(Sanitizers.Deobfuscate))
             {
                 Deobfuscate();
             }
-            if (sanitizations.HasFlag(GSanitizations.RegisterRename))
+            if (sanitizations.HasFlag(Sanitizers.RegisterRename))
             {
                 RenameRegisters();
             }
@@ -974,6 +974,38 @@ namespace HabBit.Habbo
 
             pubKeyVerifyMethod.Body.Code = pubKeyVerCode.ToArray();
             return true;
+        }
+        public Tuple<string, int?> ExtractEndPoint()
+        {
+            ABCFile abc = ABCFiles.Last();
+
+            ASInstance socketConnection = abc.GetFirstInstance("SocketConnection");
+            if (socketConnection == null) return null;
+
+            ASMethod initMethod = socketConnection.GetMethod(2, "init", "Boolean");
+            if (initMethod == null) return null;
+
+            int? port = null;
+            var host = string.Empty;
+            ASCode code = initMethod.Body.ParseCode();
+            for (int i = 0; i < code.Count; i++)
+            {
+                ASInstruction instruction = code[i];
+                if (!Local.IsSetLocal(instruction.OP)) continue;
+
+                var local = (Local)instruction;
+                if (local.Register == 1) // Host
+                {
+                    var beforeIns = (PushStringIns)code[i - 1];
+                    host = beforeIns.Value;
+                }
+                else if (local.Register == 2) // Port
+                {
+                    var portPush = (Primitive)code[i - 1];
+                    port = ((int?)portPush.Value);
+                }
+            }
+            return Tuple.Create(host, port);
         }
         public bool InjectEndPoint(string host, int port)
         {
