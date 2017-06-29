@@ -7,8 +7,10 @@ namespace HabBit.Commands
     {
         public string Name { get; }
         public CommandActions Actions { get; }
+
+        public int MinParams { get; set; }
         public object Default { get; set; }
-        
+
         public CommandAttribute(string name, CommandActions actions)
         {
             Name = name;
