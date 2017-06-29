@@ -3,7 +3,6 @@ using System.IO;
 using System.Reflection;
 using System.Collections.Generic;
 
-using HabBit.Habbo;
 using HabBit.Commands;
 
 using Flazzy;
