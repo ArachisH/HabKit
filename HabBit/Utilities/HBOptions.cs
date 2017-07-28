@@ -56,7 +56,7 @@ namespace HabBit.Utilities
         [Command("/rev", CommandActions.Modify, MinParams = 1)]
         public string Revision { get; set; }
 
-        [Command("/rsa", CommandActions.Modify, MinParams = 1)]
+        [Command("/rsa", CommandActions.Modify)]
         public RSACommand RSAInfo { get; set; }
 
         [Command("/rawcam", CommandActions.Modify)]
