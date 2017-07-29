@@ -585,6 +585,61 @@ namespace HabBit.Habbo
         }
         #endregion
 
+        public bool AddBackGameCenterIcon()
+        {
+            ABCFile abc = ABCFiles.Last();
+            ASInstance bottomBarLeft = abc.GetFirstInstance("BottomBarLeft");
+
+            if (bottomBarLeft == null) return false;
+
+            ASMethod visibleButtonsMethod = bottomBarLeft.GetMethods(1, "void")
+                                                         .First(m => m.Parameters[0].Type.Name == "String");
+
+            ASCode visibleButtonsCode = visibleButtonsMethod.Body.ParseCode();
+
+            for (int i = 0; i < visibleButtonsCode.Count; i++)
+            {
+                ASInstruction instruction = visibleButtonsCode[i];
+
+                if (instruction.OP != OPCode.GetLocal) continue;
+
+                GetLocalIns getLocal1 = (GetLocalIns)instruction;
+
+                if (getLocal1.Register != 4) continue;
+
+                if (visibleButtonsCode[i + 1].OP != OPCode.GetProperty) continue;
+
+                GetPropertyIns getProperty1 = (GetPropertyIns)visibleButtonsCode[i + 1];
+
+                if (getProperty1.PropertyName.Name != "name") continue;
+
+                PushStringIns pushString1 = (PushStringIns)visibleButtonsCode[i + 2];
+
+                if (pushString1.Value != "GAMES") continue;
+
+                ASTrait habboToolbarPropertySlot = bottomBarLeft.GetSlotTraits("HabboToolbar").FirstOrDefault();
+                if (habboToolbarPropertySlot == null) return false;
+
+                visibleButtonsCode.RemoveRange(i + 5, 3);
+
+                visibleButtonsCode.InsertRange(i + 5, new ASInstruction[] {
+                    // _local_4.visible = getBoolean("game.center.enabled");
+                    new GetLocalIns(4),
+                    new GetLocal0Ins(),
+                    new GetPropertyIns(abc, habboToolbarPropertySlot.QNameIndex),
+                    new PushStringIns(abc, "game.center.enabled"),
+                    new CallPropertyIns(abc, abc.Pool.GetMultinameIndex("getBoolean"), 1),
+                    new SetPropertyIns(abc, abc.Pool.GetMultinameIndex("visible"))
+                });
+
+                break;
+            }
+
+            visibleButtonsMethod.Body.Code = visibleButtonsCode.ToArray();
+
+            return true;
+        }
+
         public bool InjectRawCamera()
         {
             // TODO: Try to split this up.
