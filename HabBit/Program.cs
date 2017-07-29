@@ -292,6 +292,12 @@ namespace HabBit
                 Game.EnableDescriptions().WriteLineResult();
             }
 
+            if (Options.IsAddingBackGameCenter)
+            {
+                Console.Write("Adding back gamecenter button...");
+                Game.AddBackGameCenterIcon().WriteLineResult();
+            }
+
             if (Options.IsInjectingRawCamera)
             {
                 Console.Write("Injecting Raw Camera...");
