@@ -74,6 +74,9 @@ namespace HabBit.Utilities
         [Command("/eep", CommandActions.Extract)]
         public bool IsExtractingEndPoint { get; set; }
 
+        [Command("/gamecenter", CommandActions.Modify)]
+        public bool IsAddingBackGameCenter { get; set; }
+
         static HBOptions()
         {
             _commands = new Dictionary<string, PropertyInfo>();
