@@ -1,28 +1,33 @@
 # HabKit
-Command line tool that provides the user with a set of APIs to manipulate the Habbo Hotel client, or simply retrieving information/data from the game.
-
-## Requirements
-* [.NET Core 2.0 Runtime](https://www.microsoft.com/net/core)
+Command line tool that provides the user with a set of APIs to manipulate the Habbo Hotel client, or simply retrieving information/data from the game.  
 
 Download, and extract the latest release somewhere accessible on your computer, excluding your recycle bin.
 You can find the latest release here: https://github.com/ArachisH/HabBit/releases/latest
 
-## Arguments
-| Argument                                                                        | Description                                                                                                                                                    |
+## Requirements
+* [.NET Core 2.0 Runtime](https://www.microsoft.com/net/core)
+
+## Commands
+| Command                                                                         | Description                                                                                                                                                    |
 |:-------------------------------------------------------------------------------:|:--------------------------------------------------------------------------------------------------------------------------------------------------------------:|
 | /c (none : zlib : lzma)                                                         | Compression to use when assembling client.                                                                                                                     |
 | /clean                                                                          | Sanitizes the client by deobfuscating methods, and renaming invalid identifiers.                                                                               |
 | /dcrypto                                                                        | Disables all aspects of cryptography within the client(RC4/Handshake).                                                                                         |
 | /dhost                                                                          | Disable certain methods in the client to allow it to run from any host.                                                                                        |
 | /dir (directoryName)                                                            | Specify a custom output directory, rather than defaulting to the base directory of the specified client.                                                       |
-| /dlog (?functionName)                                                           | Enables the client's internal log function, and invokes the external function name **console.log** by default.                                                 |
+| /dlog ?(functionName)                                                           | Enables the client's internal log function, and invokes the external function name **console.log** by default.                                                 |
 | /dump                                                                           | Dumps Outgoing/Incoming message data to a text file(Header, Hash, Constructor Signature).                                                                      |
-| /fetch (?revisionName)                                                          | Downloads the latest client, or a specific build based on the provided revision                                                                                |
-| /hardep ("host:port")                                                           | Hardcodes an address that will be used by all SocketConnection instances.                                                                                      |
-| /kshout (?id)                                                                   | Client will be forced to publicly share the DH(RC4 Stream Cipher) private key to any connected parties.                                                        |
-| /match (?-mc)(?-p regexPattern)(clientPath clientHeadersPath serverHeadersPath) | Replaces the headers in the given Client/Server header files by comparing the hashes with the provided client, against the current one.                        |
+| /fetch ?(revisionName)                                                          | Downloads the latest client, or a specific build based on the provided revision                                                                                |
+| /hardep (HOST:PORT)                                                             | Hardcodes an address that will be used by all SocketConnection instances.                                                                                      |
+| /kshout ?(id)                                                                   | Client will be forced to publicly share the DH(RC4 Stream Cipher) private key to any connected parties.                                                        |
+| /match ?(-mc)?(-p regexPattern)(clientPath clientHeadersPath serverHeadersPath) | Replaces the headers in the given Client/Server header files by comparing the hashes with the provided client, against the current one.                        |
 | /rev  (revisionValue)                                                           | Sets the client's revision value found in the Outgoing[4000] message class handler.                                                                            |
-| /rsa (?keySize : ?(modulus exponent))                                           | Override the client's internal public RSA keys with a newly generated pair, or an already existing one.                                                        |
+| /rsa ?(keySize) : ?(modulus exponent)                                           | Override the client's internal public RSA keys with a newly generated pair, or an already existing one.                                                        |
+
+## Command Table Legend
+**( )** = Needed Parameter(s)  
+**?( )** = Optional Parameter(s)  
+**() : ()** = Multiple Parameter Choices(OR)  
 
 #### Default RSA Keys
 ```
