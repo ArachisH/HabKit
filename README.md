@@ -2,7 +2,7 @@
 Command line tool that provides the user with a set of APIs to manipulate the Habbo Hotel client, or simply retrieving information/data from the game.  
 
 Download, and extract the latest release somewhere accessible on your computer, excluding your recycle bin.
-You can find the latest release here: https://github.com/ArachisH/HabBit/releases/latest
+You can find the latest release here: https://github.com/ArachisH/HabKit/releases/latest
 
 ## Requirements
 * [.NET Core 2.0 Runtime](https://www.microsoft.com/net/core)
