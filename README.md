@@ -1,26 +1,12 @@
-# HabBit
-Command line tool for allowing the user to remove certain restrictions from the Habbo Hotel client that does not originally allow it to be used locally.
+# HabKit
+Command line tool that provides the user with a set of APIs to manipulate the Habbo Hotel client, or simply retrieving information/data from the game.
 
 ## Requirements
-* .NET Framework 4.0+
-
-## Getting Started
-This section is for people who've never used a command line tool before, proceed to the next section for the list of [arguments](#arguments).
+* [.NET Core 2.0 Runtime](https://www.microsoft.com/net/core)
 
 Download, and extract the latest release somewhere accessible on your computer, excluding your recycle bin.
 You can find the latest release here: https://github.com/ArachisH/HabBit/releases/latest
 
-I'll assume you extracted it onto your desktop under a folder named **HabBit**, so with that, let's start up the command prompt.
-(Windows Key + R) This key combination will bring up some box, type **cmd** into the input box and hit the **OK**.
-
-Some black box should have appeared, the next step involves changing the current active directory that the console is pointing to. By default, it should be pointing to **C:\Users\\{Username}**. We need to change the directory to points towards the folder to where HabBit has been extracted to, to do this use the **cd** command followed by the path. If you didn't extract it to a folder named HabBit onto your desktop, then your path should look different based on where it is.
-```
-cd C:\Users\{Username}\Desktop\HabBit
-```
-We can now run some basic functions on the client like so:
-```
-HabBit.exe Client.swf /clean /dhost /rsa
-```
 ## Arguments
 | Argument                                                                        | Description                                                                                                                                                    |
 |:-------------------------------------------------------------------------------:|:--------------------------------------------------------------------------------------------------------------------------------------------------------------:|
