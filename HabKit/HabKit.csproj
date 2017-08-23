@@ -3,6 +3,11 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>netcoreapp2.0</TargetFramework>
+	<GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+	<UpdateAssemblyFileVersion>True</UpdateAssemblyFileVersion>
+    <UpdateAssemblyInfoVersion>False</UpdateAssemblyInfoVersion>
+    <AssemblyVersionSettings>None.IncrementOnDemandWithReset.Increment.None</AssemblyVersionSettings>
+    <AssemblyFileVersionSettings>None.IncrementOnDemandWithReset.None.None</AssemblyFileVersionSettings>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">

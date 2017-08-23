@@ -129,7 +129,7 @@ namespace HabKit
                 Console.CursorVisible = false;
 
                 Version asmVersion = Assembly.GetExecutingAssembly().GetName().Version;
-                Console.Title = ("HabBit v" + asmVersion);
+                Console.Title = ("HabKit v" + asmVersion);
 
                 new Program(args).Run();
             }
