@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace HabBit.Commands
+namespace HabKit.Commands
 {
     [AttributeUsage(AttributeTargets.Property)]
     public sealed class CommandAttribute : Attribute

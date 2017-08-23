@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace HabBit.Commands
+namespace HabKit.Commands
 {
     [Flags]
     public enum CommandActions

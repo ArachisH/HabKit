@@ -6,16 +6,16 @@ using System.Reflection;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
 
-using HabBit.Habbo;
-using HabBit.Commands;
-using HabBit.Utilities;
+using HabKit.Habbo;
+using HabKit.Commands;
+using HabKit.Utilities;
 
 using Flazzy;
 using Flazzy.IO;
 using Flazzy.ABC;
 using Flazzy.Tags;
 
-namespace HabBit
+namespace HabKit
 {
     public class Program
     {

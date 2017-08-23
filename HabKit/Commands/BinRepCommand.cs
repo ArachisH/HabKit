@@ -1,7 +1,7 @@
 ﻿using System.IO;
 using System.Collections.Generic;
 
-namespace HabBit.Commands
+namespace HabKit.Commands
 {
     public class BinRepCommand : Command
     {

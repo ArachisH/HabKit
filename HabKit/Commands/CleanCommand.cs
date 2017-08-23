@@ -1,8 +1,8 @@
 ﻿using System.Collections.Generic;
 
-using HabBit.Habbo;
+using HabKit.Habbo;
 
-namespace HabBit.Commands
+namespace HabKit.Commands
 {
     public class CleanCommand : Command
     {

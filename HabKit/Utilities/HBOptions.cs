@@ -3,11 +3,11 @@ using System.IO;
 using System.Reflection;
 using System.Collections.Generic;
 
-using HabBit.Commands;
+using HabKit.Commands;
 
 using Flazzy;
 
-namespace HabBit.Utilities
+namespace HabKit.Utilities
 {
     public class HBOptions
     {

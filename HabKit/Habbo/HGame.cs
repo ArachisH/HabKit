@@ -12,7 +12,7 @@ using Flazzy.Records;
 using Flazzy.ABC.AVM2;
 using Flazzy.ABC.AVM2.Instructions;
 
-namespace HabBit.Habbo
+namespace HabKit.Habbo
 {
     [Flags]
     public enum Sanitizers

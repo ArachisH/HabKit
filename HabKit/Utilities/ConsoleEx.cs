@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace HabBit.Utilities
+namespace HabKit.Utilities
 {
     public static class ConsoleEx
     {

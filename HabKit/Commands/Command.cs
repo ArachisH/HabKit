@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
 
-namespace HabBit.Commands
+namespace HabKit.Commands
 {
     public abstract class Command
     {
