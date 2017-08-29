@@ -1,3 +1,6 @@
 [submodule "Submodules/Flazzy"]
 	path = Submodules/Flazzy
 	url = https://github.com/ArachisH/Flazzy
+[submodule "Submodules/Sulakore"]
+	path = Submodules/Sulakore
+	url = https://github.com/ArachisH/Sulakore

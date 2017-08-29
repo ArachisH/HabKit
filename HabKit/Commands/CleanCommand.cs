@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
 
-using HabKit.Habbo;
+using Sulakore.Habbo;
 
 namespace HabKit.Commands
 {

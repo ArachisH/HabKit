@@ -17,6 +17,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Submodules\Flazzy\Flazzy\Flazzy.csproj" />
+    <ProjectReference Include="..\Submodules\Sulakore\Sulakore\Sulakore.csproj" />
   </ItemGroup>
 
 </Project>

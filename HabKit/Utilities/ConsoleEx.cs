@@ -22,7 +22,6 @@ namespace HabKit.Utilities
         public static void WriteLineResult(this bool value)
         {
             Console.Write(" | ");
-
             ConsoleColor oldClr = Console.ForegroundColor;
 
             Console.ForegroundColor = (value ? ConsoleColor.Green : ConsoleColor.Red);

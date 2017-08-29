@@ -6,7 +6,6 @@ using System.Reflection;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
 
-using HabKit.Habbo;
 using HabKit.Commands;
 using HabKit.Utilities;
 
@@ -14,6 +13,8 @@ using Flazzy;
 using Flazzy.IO;
 using Flazzy.ABC;
 using Flazzy.Tags;
+
+using Sulakore.Habbo;
 
 namespace HabKit
 {
@@ -69,7 +70,7 @@ namespace HabKit
                 var unmatchedMethods = new Dictionary<string, List<ASMethod>>();
                 foreach (ASMethod method in game_1.ABCFiles[0].Methods)
                 {
-                    using (var hasher = new MessageHasher(false))
+                    using (var hasher = new HashWriter(false))
                     {
                         hasher.Write(method);
                         string hash = hasher.GenerateMD5Hash();
@@ -86,7 +87,7 @@ namespace HabKit
 
                 foreach (ASMethod method in game_2.ABCFiles[0].Methods)
                 {
-                    using (var hasher = new MessageHasher(false))
+                    using (var hasher = new HashWriter(false))
                     {
                         hasher.Write(method);
                         string hash = hasher.GenerateMD5Hash();
@@ -127,10 +128,7 @@ namespace HabKit
             try
             {
                 Console.CursorVisible = false;
-
-                Version asmVersion = Assembly.GetExecutingAssembly().GetName().Version;
-                Console.Title = ("HabKit v" + asmVersion);
-
+                Console.Title = ("HabKit v" + Assembly.GetExecutingAssembly().GetName().Version);
                 new Program(args).Run();
             }
             finally { Console.CursorVisible = true; }
@@ -219,10 +217,9 @@ namespace HabKit
         {
             if (Options.BinRepInfo != null)
             {
-                var toReplaceIds = string.Join(", ",
-                    Options.BinRepInfo.Replacements.Keys.Select(k => k.ToString()));
-
+                var toReplaceIds = string.Join(", ", Options.BinRepInfo.Replacements.Keys);
                 Console.Write($"Replacing Binary Data({toReplaceIds})...");
+
                 foreach (DefineBinaryDataTag defBinData in Game.Tags
                     .Where(t => t.Kind == TagKind.DefineBinaryData))
                 {
@@ -235,10 +232,8 @@ namespace HabKit
                 }
                 if (Options.BinRepInfo.Replacements.Count > 0)
                 {
-                    var failedReplaceIds = string.Join(", ",
-                        Options.BinRepInfo.Replacements.Keys.Select(k => k.ToString()));
-
-                    Console.Write($" | Data Replace Failed: Ids({failedReplaceIds})");
+                    var failedReplaceIds = string.Join(", ", Options.BinRepInfo.Replacements.Keys);
+                    Console.Write($" | Replacement Failed({failedReplaceIds})");
                 }
                 ConsoleEx.WriteLineFinished();
             }
@@ -357,7 +352,7 @@ namespace HabKit
 
                     msgsOutput.WriteLine();
 
-                    msgsOutput.WriteLine("// Incoming Messages | " + Game.OutMessages.Count.ToString("n0"));
+                    msgsOutput.WriteLine("// Incoming Messages | " + Game.InMessages.Count.ToString("n0"));
                     WriteMessages(msgsOutput, "Incoming", Game.InMessages);
 
                     Console.WriteLine("Messages Saved: " + msgsPath);
