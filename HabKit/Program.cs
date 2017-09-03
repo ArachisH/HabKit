@@ -498,113 +498,70 @@ namespace HabKit
         private void ReplaceHeaders(FileInfo file, IDictionary<ushort, MessageItem> previousMessages, string revision)
         {
             int totalMatches = 0, matchAttempts = 0;
-            using (var fileOutput = new StreamReader(file.FullName))
-            using (var replaceOutput = new StreamWriter(Path.Combine(Options.OutputDirectory, file.Name), false))
+            using (var input = new StreamReader(file.FullName))
+            using (var output = new StreamWriter(Path.Combine(Options.OutputDirectory, file.Name), false))
             {
                 if (!Options.MatchInfo.MinimalComments)
                 {
-                    replaceOutput.WriteLine("// Current: " + Game.Revision);
-                    replaceOutput.WriteLine("// Previous: " + revision);
+                    output.WriteLine("// Current: " + Game.Revision);
+                    output.WriteLine("// Previous: " + revision);
                 }
-                while (!fileOutput.EndOfStream)
+                while (!input.EndOfStream)
                 {
-                    string line = fileOutput.ReadLine();
-
+                    string line = input.ReadLine();
                     int possibleCommentIndex = line.IndexOf("//");
                     if (possibleCommentIndex != -1)
                     {
                         line = Regex.Replace(line, "([a-z]|[A-Z]|\\s)//(.*?)$", string.Empty, RegexOptions.RightToLeft);
                         if (string.IsNullOrWhiteSpace(line)) continue;
-                        if (possibleCommentIndex >= line.Length)
-                        {
-                            line = line.TrimEnd();
-                        }
+                        if (possibleCommentIndex < line.Length) continue;
+                        line = line.TrimEnd();
                     }
 
-                    Match declaration = Regex.Match(line, Options.MatchInfo.Pattern);
-                    if (declaration.Success)
+                    Match idMatch = Regex.Matches(line, Options.MatchInfo.Pattern)[Options.MatchInfo.IdentifierIndex];
+                    if (!idMatch?.Success ?? true) output.WriteLine(line);
+                    else
                     {
-                        ushort prevHeader = 0;
-                        bool isCritical = false;
-                        var suffix = string.Empty;
-                        MessageItem previousMessage = null;
-                        List<MessageItem> similarMessages = null;
-
-                        string end = declaration.Groups["end"].Value;
-                        string start = declaration.Groups["start"].Value;
-                        string headerString = declaration.Groups["id"].Value;
+                        string prefix = line.Substring(0, idMatch.Index).Replace(revision, Game.Revision);
+                        string suffix = line.Substring(idMatch.Index + idMatch.Length).Replace(revision, Game.Revision);
+                        output.Write(prefix);
 
                         matchAttempts++;
-                        if (!ushort.TryParse(headerString, out prevHeader))
+                        MessageItem match = null;
+                        var comment = string.Empty;
+                        if (!ushort.TryParse(idMatch.Value, out ushort id))
                         {
                             matchAttempts--;
-                            isCritical = true;
-                            suffix = " //! Invalid Header";
+                            output.Write("-1");
+                            comment = (" //! Invalid Message ID: " + idMatch.Value);
                         }
-                        else if (!previousMessages.TryGetValue(prevHeader, out previousMessage))
+                        else if (!previousMessages.TryGetValue(id, out MessageItem prevMessage))
                         {
                             matchAttempts--;
-                            isCritical = true;
-                            headerString = "-1";
-                            suffix = $" //! Unknown Message({prevHeader})";
+                            output.Write("-1");
+                            comment = (" //! Message Not Found: " + id);
                         }
-                        else if (!Game.Messages.TryGetValue(previousMessage.Hash, out similarMessages))
+                        else if (!Game.Messages.TryGetValue(prevMessage.Hash, out List<MessageItem> matches))
                         {
-                            isCritical = true;
-                            headerString = "-1";
-                            suffix = $" //! Zero Matches({prevHeader})";
+                            output.Write("-1");
+                            comment = (" //! No Matches: " + id);
                         }
-                        else if (similarMessages.Count > 1)
-                        {
-                            headerString = "-1";
-                            suffix = $" //! Duplicate Matches({prevHeader})";
-                            foreach (MessageItem similarMessage in similarMessages)
-                            {
-                                if (previousMessage.Class.QName.Name == similarMessage.Class.QName.Name)
-                                {
-                                    totalMatches++;
-                                    suffix = (" // " + prevHeader);
-                                    headerString = similarMessage.Id.ToString();
-                                    break;
-                                }
-                                else
-                                {
-                                    int previousClassRankTotal = 0;
-                                    foreach (MessageReference reference in previousMessage.References)
-                                    {
-                                        previousClassRankTotal += reference.ClassRank;
-                                    }
+                        else match = prevMessage.GetClosestMatch(matches);
 
-                                    int similarClassRankTotal = 0;
-                                    foreach (MessageReference similarReference in similarMessage.References)
-                                    {
-                                        similarClassRankTotal += similarReference.ClassRank;
-                                    }
-
-                                    if (previousClassRankTotal == similarClassRankTotal)
-                                    {
-                                        totalMatches++;
-                                        suffix = (" // " + prevHeader);
-                                        headerString = similarMessage.Id.ToString();
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-                        else
+                        if (match != null)
                         {
                             totalMatches++;
-                            suffix = (" // " + prevHeader);
-                            headerString = similarMessages[0].Id.ToString();
+                            comment = (" // " + id);
+                            output.Write(Options.MatchInfo.IsOutputtingHashes ? match.Hash : match.Id.ToString());
                         }
-                        if (!isCritical && Options.MatchInfo.MinimalComments)
+                        output.Write(suffix);
+
+                        if (!Options.MatchInfo.MinimalComments)
                         {
-                            suffix = null;
+                            output.Write(comment);
                         }
-                        line = $"{start}{headerString}{end}{suffix}";
-                        line = line.Replace(revision, Game.Revision);
+                        output.WriteLine();
                     }
-                    replaceOutput.WriteLine(line);
                 }
             }
             Console.Write($" | Matches: {totalMatches}/{matchAttempts}");
