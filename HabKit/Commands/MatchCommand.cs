@@ -6,7 +6,10 @@ namespace HabKit.Commands
     public class MatchCommand : Command
     {
         public bool MinimalComments { get; set; }
-        public string Pattern { get; set; } = @"(?<start>(.*?)[^""])(?<id>[+-]?[0-9]\d*(\.\d+)?)\b(?<end>[^\r|$]*)";
+        public bool IsOutputtingHashes { get; set; }
+
+        public int IdentifierIndex { get; set; }
+        public string Pattern { get; set; } = @"(?<![a-zA-Z_-])-?[^\s\D][0-9]{0,3}(?=\D*$)";
 
         public FileInfo PreviousGameInfo { get; set; }
         public FileInfo ClientHeadersInfo { get; set; }
@@ -19,13 +22,17 @@ namespace HabKit.Commands
                 string parameter = parameters.Dequeue();
                 switch (parameter)
                 {
-                    case "-p":
+                    case "-ii":
                     {
-                        Pattern = parameters.Dequeue()
-                            .Replace(@"^<", @"<")
-                            .Replace(@"^^", @"^")
-                            .Replace(@"^>", @">");
-
+                        if (ushort.TryParse(parameters.Dequeue(), out ushort identifierIndex))
+                        {
+                            IdentifierIndex = identifierIndex;
+                        }
+                        break;
+                    }
+                    case "-h":
+                    {
+                        IsOutputtingHashes = true;
                         break;
                     }
                     case "-mc":
