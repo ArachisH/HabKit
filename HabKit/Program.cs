@@ -289,7 +289,7 @@ namespace HabKit
 
             if (Options.IsAddingBackGameCenter)
             {
-                Console.Write("Adding back gamecenter button...");
+                Console.Write("Enabling GameCenter...");
                 Game.AddBackGameCenterIcon().WriteLineResult();
             }
 
