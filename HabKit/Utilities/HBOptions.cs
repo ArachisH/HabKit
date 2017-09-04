@@ -71,9 +71,6 @@ namespace HabKit.Utilities
         [Command("/binrep", CommandActions.Modify, MinParams = 2)]
         public BinRepCommand BinRepInfo { get; set; }
 
-        [Command("/eep", CommandActions.Extract)]
-        public bool IsExtractingEndPoint { get; set; }
-
         [Command("/gamecenter", CommandActions.Modify)]
         public bool IsAddingBackGameCenter { get; set; }
 

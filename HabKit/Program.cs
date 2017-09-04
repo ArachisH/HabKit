@@ -326,19 +326,6 @@ namespace HabKit
                 ConsoleEx.WriteLineFinished();
             }
 
-            if (Options.IsExtractingEndPoint)
-            {
-                Console.Write("Extracting End Point...");
-                Tuple<string, int?> endPoint = Game.ExtractEndPoint();
-
-                string endPointPath = Path.Combine(Options.OutputDirectory, "EndPoint.txt");
-                using (var endPointOutput = new StreamWriter(endPointPath, false))
-                {
-                    endPointOutput.Write($"{endPoint.Item1}:{endPoint.Item2}");
-                }
-                ConsoleEx.WriteLineFinished();
-            }
-
             if (Options.IsDumpingMessageData)
             {
                 string msgsPath = Path.Combine(Options.OutputDirectory, "Messages.txt");
