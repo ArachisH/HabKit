@@ -20,7 +20,7 @@ You can find the latest release here: https://github.com/ArachisH/HabKit/release
 | /fetch ?[revisionName]                                                          | Downloads the latest client, or a specific build based on the provided revision                                                                                |
 | /hardep [host:port]                                                             | Hardcodes an address that will be used by all SocketConnection instances.                                                                                      |
 | /kshout ?[id]                                                                   | Client will be forced to publicly share the DH(RC4 Stream Cipher) private key to any connected parties.                                                        |
-| /match ?[-mc] ?[-ii] [clientPath clientHeadersPath serverHeadersPath]           | Replaces the headers in the given Client/Server header files by comparing the hashes with the provided client, against the current one.                        |
+| /match ?[-mc] ?[-ii] ?[-h] [clientPath clientHeadersPath serverHeadersPath]     | Replaces the headers in the given Client/Server header files by comparing the hashes with the provided client, against the current one.                        |
 | /rev [revisionValue]                                                            | Sets the client's revision value found in the Outgoing[4000] message class handler.                                                                            |
 | /rsa ?[[keySize], [modulus exponent]]                                           | Override the client's internal public RSA keys with a newly generated pair, or an already existing one.                                                        |
 | /rawcam                                                                         | Sends a raw blob of binary data to the server that represents the picture the user is trying to preview.                                                       |
@@ -52,6 +52,12 @@ You can find the latest release here: https://github.com/ArachisH/HabKit/release
 * Hardcode EndPoint  
 `dotnet HabKit.dll Client.swf /hardep 127.0.0.1:8989`  
 `dotnet HabKit.dll Client.swf /hardep yourHost.com:8989`  
+
+# Message ID Updating
+`dotnet HabKit.dll Client.swf /match Previous.swf ClientHeaders.file ServerHeaders.file`
+`dotnet HabKit.dll Client.swf /match Previous.swf ClientHeaders.file ServerHeaders.file -h`
+`dotnet HabKit.dll Client.swf /match Previous.swf ClientHeaders.file ServerHeaders.file -mc`
+`dotnet HabKit.dll Client.swf /match Previous.swf ClientHeaders.file ServerHeaders.file -ii 1`
 
 * Client Sanitation  
   * Register Renaming `dotnet HabKit.dll Client.swf /clean -rr`  
