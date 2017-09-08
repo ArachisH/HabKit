@@ -53,11 +53,11 @@ You can find the latest release here: https://github.com/ArachisH/HabKit/release
 `dotnet HabKit.dll Client.swf /hardep 127.0.0.1:8989`  
 `dotnet HabKit.dll Client.swf /hardep yourHost.com:8989`  
 
-# Message ID Updating
-`dotnet HabKit.dll Client.swf /match Previous.swf ClientHeaders.file ServerHeaders.file`
-`dotnet HabKit.dll Client.swf /match Previous.swf ClientHeaders.file ServerHeaders.file -h`
-`dotnet HabKit.dll Client.swf /match Previous.swf ClientHeaders.file ServerHeaders.file -mc`
-`dotnet HabKit.dll Client.swf /match Previous.swf ClientHeaders.file ServerHeaders.file -ii 1`
+* Message ID Updating  
+`dotnet HabKit.dll Client.swf /match Previous.swf ClientHeaders.file ServerHeaders.file`  
+`dotnet HabKit.dll Client.swf /match Previous.swf ClientHeaders.file ServerHeaders.file -h`  
+`dotnet HabKit.dll Client.swf /match Previous.swf ClientHeaders.file ServerHeaders.file -mc`  
+`dotnet HabKit.dll Client.swf /match Previous.swf ClientHeaders.file ServerHeaders.file -ii 1`  
 
 * Client Sanitation  
   * Register Renaming `dotnet HabKit.dll Client.swf /clean -rr`  
