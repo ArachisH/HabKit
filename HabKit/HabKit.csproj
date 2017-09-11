@@ -1,22 +1,29 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
+    <Prefer32Bit>true</Prefer32Bit>
+    <LangVersion>default</LangVersion>
+
+    <TrimUnusedDependencies>true</TrimUnusedDependencies>
+
     <OutputType>Exe</OutputType>
-    <TargetFramework>netcoreapp2.0</TargetFramework>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <TargetFrameworks>netcoreapp2.0;net47</TargetFrameworks>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <ShouldCreateLogs>True</ShouldCreateLogs>
+    <UpdateAssemblyVersion>True</UpdateAssemblyVersion>
+    <AdvancedSettingsExpanded>False</AdvancedSettingsExpanded>
     <UpdateAssemblyFileVersion>True</UpdateAssemblyFileVersion>
     <UpdateAssemblyInfoVersion>False</UpdateAssemblyInfoVersion>
     <AssemblyVersionSettings>None.IncrementOnDemandWithReset.Increment.None</AssemblyVersionSettings>
     <AssemblyFileVersionSettings>None.IncrementOnDemandWithReset.None.None</AssemblyFileVersionSettings>
-    <ShouldCreateLogs>True</ShouldCreateLogs>
-    <AdvancedSettingsExpanded>False</AdvancedSettingsExpanded>
-    <UpdateAssemblyVersion>True</UpdateAssemblyVersion>
   </PropertyGroup>
 
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
-    <Prefer32Bit>true</Prefer32Bit>
-    <LangVersion>default</LangVersion>
-  </PropertyGroup>
+  <ItemGroup Condition="'$(TargetFramework)' != 'netcoreapp2.0'">
+    <PackageReference Include="Microsoft.Packaging.Tools.Trimming" Version="1.0.0-preview2-25401-01" />
+  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Submodules\Flazzy\Flazzy\Flazzy.csproj" />
