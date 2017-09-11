@@ -4,8 +4,14 @@ Command line tool that provides the user with a set of APIs to manipulate the Ha
 Download, and extract the latest release somewhere accessible on your computer, excluding your recycle bin.
 You can find the latest release here: https://github.com/ArachisH/HabKit/releases/latest
 
+Starting at [HabKit v4.4](https://github.com/ArachisH/HabKit/releases/tag/v4.4.0.0)+, the download(s) will begin including binaries targeting both .NET Framework 4.7, and .NET Core 2.0.  
+If you're using the .NET Core 2.0 binaries, you must prefix all commands with `dotnet`, ex:  
+`dotnet HabKit.dll /fetch`
+
 ## Requirements
-* [.NET Core 2.0 Runtime](https://www.microsoft.com/net/core)
+* [.NET Core 2.0 Runtime](https://www.microsoft.com/net/core)  
+OR
+* [.NET Framework 4.7](https://www.microsoft.com/en-us/download/details.aspx?id=55170)
 
 ## Commands
 | Command                                                                         | Description                                                                                                                                                    |
@@ -37,33 +43,33 @@ You can find the latest release here: https://github.com/ArachisH/HabKit/release
 
 ## Command Examples
 * Fetching Client  
-`dotnet HabKit.dll /fetch`  
-`dotnet HabKit.dll /fetch REVISION-XXXXXXXXXXXXXXX`  
+`HabKit.dll /fetch`  
+`HabKit.dll /fetch REVISION-XXXXXXXXXXXXXXX`  
 
 * Change RSA Keys  
-`dotnet HabKit.dll Client.swf /dcrypto`  
-`dotnet HabKit.dll Client.swf /dcrypto 1024`  
-`dotnet HabKit.dll Client.swf /dcrypto 3 86851dd364..........1a9dc783b7`  
+`HabKit.dll Client.swf /dcrypto`  
+`HabKit.dll Client.swf /dcrypto 1024`  
+`HabKit.dll Client.swf /dcrypto 3 86851dd364..........1a9dc783b7`  
 
 * Binary Data Replacement  
-`dotnet HabKit.dll Client.swf /binrep 2727 C:\SomeNewFile.xml`  
-`dotnet HabKit.dll Client.swf /binrep 2727 C:\SomeNewFile.xml 6382 C:\SomeOtherFile.xml`  
+`HabKit.dll Client.swf /binrep 2727 C:\SomeNewFile.xml`  
+`HabKit.dll Client.swf /binrep 2727 C:\SomeNewFile.xml 6382 C:\SomeOtherFile.xml`  
 
 * Hardcode EndPoint  
-`dotnet HabKit.dll Client.swf /hardep 127.0.0.1:8989`  
-`dotnet HabKit.dll Client.swf /hardep yourHost.com:8989`  
+`HabKit.dll Client.swf /hardep 127.0.0.1:8989`  
+`HabKit.dll Client.swf /hardep yourHost.com:8989`  
 
 * Message ID Updating  
-`dotnet HabKit.dll Client.swf /match Previous.swf ClientHeaders.file ServerHeaders.file`  
-`dotnet HabKit.dll Client.swf /match Previous.swf ClientHeaders.file ServerHeaders.file -h`  
-`dotnet HabKit.dll Client.swf /match Previous.swf ClientHeaders.file ServerHeaders.file -mc`  
-`dotnet HabKit.dll Client.swf /match Previous.swf ClientHeaders.file ServerHeaders.file -ii 1`  
+`HabKit.dll Client.swf /match Previous.swf ClientHeaders.file ServerHeaders.file`  
+`HabKit.dll Client.swf /match Previous.swf ClientHeaders.file ServerHeaders.file -h`  
+`HabKit.dll Client.swf /match Previous.swf ClientHeaders.file ServerHeaders.file -mc`  
+`HabKit.dll Client.swf /match Previous.swf ClientHeaders.file ServerHeaders.file -ii 1`  
 
 * Client Sanitation  
-  * Register Renaming `dotnet HabKit.dll Client.swf /clean -rr`  
-  * Identifier Renaming `dotnet HabKit.dll Client.swf /clean -ir`  
-  * Control Flow Deobfuscation `dotnet HabKit.dll Client.swf /clean -deob`  
-  * Clorox... `dotnet HabKit.dll Client.swf /clean -rr -ir -deob`  
+  * Register Renaming `HabKit.dll Client.swf /clean -rr`  
+  * Identifier Renaming `HabKit.dll Client.swf /clean -ir`  
+  * Control Flow Deobfuscation `HabKit.dll Client.swf /clean -deob`  
+  * Default/All Sanitation Flags `HabKit.dll Client.swf /clean -rr -ir -deob`  
 
 #### Default RSA Keys
 These keys will be used when no parameters are given to the **/dcrypto** command.
