@@ -15,22 +15,29 @@ using Flazzy.ABC;
 using Flazzy.Tags;
 
 using Sulakore.Habbo;
+using Sulakore.Habbo.Messages;
 
 namespace HabKit
 {
     public class Program
     {
-        private const string EXTERNAL_VARIABLES_URL =
-            "https://www.habbo.com/gamedata/external_variables";
+        private readonly string _baseDirectory;
 
-        private const string CHROME_USER_AGENT =
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/56.0.2924.87 Safari/537.36";
+        private const string EXTERNAL_VARIABLES_URL = "https://www.habbo.com/gamedata/external_variables";
+        private const string CHROME_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/56.0.2924.87 Safari/537.36";
 
+        public Incoming In { get; }
+        public Outgoing Out { get; }
         public HGame Game { get; set; }
         public HBOptions Options { get; }
 
         public Program(string[] args)
         {
+            _baseDirectory = AppDomain.CurrentDomain.BaseDirectory;
+
+            In = new Incoming();
+            Out = new Outgoing();
+
             Options = HBOptions.Parse(args);
             if (string.IsNullOrWhiteSpace(Options.FetchRevision))
             {
@@ -324,6 +331,10 @@ namespace HabKit
                 Console.Write("Generating Message Hashes...");
                 Game.GenerateMessageHashes();
                 ConsoleEx.WriteLineFinished();
+
+                string hashesPath = (_baseDirectory + "Hashes.ini");
+                In.Load(Game, hashesPath);
+                Out.Load(Game, hashesPath);
             }
 
             if (Options.IsDumpingMessageData)
@@ -343,6 +354,15 @@ namespace HabKit
                     WriteMessages(msgsOutput, "Incoming", Game.InMessages);
 
                     Console.WriteLine("Messages Saved: " + msgsPath);
+                }
+
+                string headersPath = Path.Combine(Options.OutputDirectory, "Identities.ini");
+                using (var output = new StreamWriter(headersPath))
+                {
+                    output.WriteLine(Game.Revision);
+                    Out.Save(output);
+                    output.WriteLine();
+                    In.Save(output);
                 }
             }
 
