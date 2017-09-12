@@ -1,17 +1,19 @@
 # HabKit
 Command line tool that provides the user with a set of APIs to manipulate the Habbo Hotel client, or simply retrieving information/data from the game.  
 
-Download, and extract the latest release somewhere accessible on your computer, excluding your recycle bin.
-You can find the latest release here: https://github.com/ArachisH/HabKit/releases/latest
-
-Starting at [HabKit v4.4](https://github.com/ArachisH/HabKit/releases/tag/v4.4.0.0)+, the download(s) will begin including binaries targeting both .NET Framework 4.7, and .NET Core 2.0.  
-If you're using the .NET Core 2.0 binaries, you must prefix all commands with `dotnet`, ex:  
-`dotnet HabKit.dll /fetch`
+## Questions/Suggestions
+Any discussion regarding this project can be done in this [thread](https://forbidden.sh/topic/14-habkit-habbo-hotel-multi-purpose-kit/).  
+If you already have a GitHub account, feel free to create an issue.
 
 ## Requirements
-* [.NET Core 2.0 Runtime](https://www.microsoft.com/net/core)  
-OR
-* [.NET Framework 4.7](https://www.microsoft.com/en-us/download/details.aspx?id=55170)
+All future HabKit releases created in this repository will contain two builds that target .NET 4.7, and .NET Core 2.0.  
+This means you only need to install the framework of the build you wish to use.
+* [.NET Framework 4.0](https://www.microsoft.com/en-us/download/details.aspx?id=17851)  
+Habkit v4.3, and below target this framework/version.
+* [.NET Framework 4.7](https://www.microsoft.com/en-us/download/details.aspx?id=55170)  
+HabKit v4.4, and above target this framework/version.
+* [.NET Core 2.0](https://www.microsoft.com/net/download/core#/runtime)  
+HabKit v4.4, and above target this framework/version
 
 ## Commands
 | Command                                                                         | Description                                                                                                                                                    |
