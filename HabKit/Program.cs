@@ -525,50 +525,63 @@ namespace HabKit
                         line = line.TrimEnd();
                     }
 
-                    Match idMatch = Regex.Matches(line, Options.MatchInfo.Pattern)[Options.MatchInfo.IdentifierIndex];
-                    if (!idMatch?.Success ?? true) output.WriteLine(line);
+                    Match idMatch = null;
+                    MatchCollection idMatches = Regex.Matches(line, Options.MatchInfo.Pattern);
+                    if (idMatches.Count == 0)
+                    {
+                        output.WriteLine(line);
+                        continue;
+                    }
+
+                    if (Options.MatchInfo.IdentifierIndex < 0)
+                    {
+                        idMatch = idMatches[idMatches.Count - 1]; // Use the LAST matched id.
+                    }
                     else
                     {
-                        string prefix = line.Substring(0, idMatch.Index).Replace(revision, Game.Revision);
-                        string suffix = line.Substring(idMatch.Index + idMatch.Length).Replace(revision, Game.Revision);
-                        output.Write(prefix);
-
-                        matchAttempts++;
-                        MessageItem match = null;
-                        var comment = string.Empty;
-                        if (!ushort.TryParse(idMatch.Value, out ushort id))
-                        {
-                            matchAttempts--;
-                            output.Write("-1");
-                            comment = (" //! Invalid Message ID: " + idMatch.Value);
-                        }
-                        else if (!previousMessages.TryGetValue(id, out MessageItem prevMessage))
-                        {
-                            matchAttempts--;
-                            output.Write("-1");
-                            comment = (" //! Message Not Found: " + id);
-                        }
-                        else if (!Game.Messages.TryGetValue(prevMessage.Hash, out List<MessageItem> matches))
-                        {
-                            output.Write("-1");
-                            comment = (" //! No Matches: " + id);
-                        }
-                        else match = prevMessage.GetClosestMatch(matches);
-
-                        if (match != null)
-                        {
-                            totalMatches++;
-                            comment = (" // " + id);
-                            output.Write(Options.MatchInfo.IsOutputtingHashes ? match.Hash : match.Id.ToString());
-                        }
-                        output.Write(suffix);
-
-                        if (!Options.MatchInfo.MinimalComments)
-                        {
-                            output.Write(comment);
-                        }
-                        output.WriteLine();
+                        // If the user specified an unexpectedly large index, we'll let them know... by breaking.
+                        idMatch = idMatches[Options.MatchInfo.IdentifierIndex]; // Use the matched id at the specified(or default) index.
                     }
+
+                    string prefix = line.Substring(0, idMatch.Index).Replace(revision, Game.Revision);
+                    string suffix = line.Substring(idMatch.Index + idMatch.Length).Replace(revision, Game.Revision);
+                    output.Write(prefix);
+
+                    matchAttempts++;
+                    MessageItem match = null;
+                    var comment = string.Empty;
+                    if (!ushort.TryParse(idMatch.Value, out ushort id))
+                    {
+                        matchAttempts--;
+                        output.Write("-1");
+                        comment = (" //! Invalid Message ID: " + idMatch.Value);
+                    }
+                    else if (!previousMessages.TryGetValue(id, out MessageItem prevMessage))
+                    {
+                        matchAttempts--;
+                        output.Write("-1");
+                        comment = (" //! Message Not Found: " + id);
+                    }
+                    else if (!Game.Messages.TryGetValue(prevMessage.Hash, out List<MessageItem> matches))
+                    {
+                        output.Write("-1");
+                        comment = (" //! No Matches: " + id);
+                    }
+                    else match = prevMessage.GetClosestMatch(matches);
+
+                    if (match != null)
+                    {
+                        totalMatches++;
+                        comment = (" // " + id);
+                        output.Write(Options.MatchInfo.IsOutputtingHashes ? match.Hash : match.Id.ToString());
+                    }
+                    output.Write(suffix);
+
+                    if (!Options.MatchInfo.MinimalComments)
+                    {
+                        output.Write(comment);
+                    }
+                    output.WriteLine();
                 }
             }
             Console.Write($" | Matches: {totalMatches}/{matchAttempts}");
