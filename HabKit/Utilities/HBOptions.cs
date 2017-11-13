@@ -39,7 +39,7 @@ namespace HabKit.Utilities
         public string MessageLogger { get; set; }
 
         [Command("/dump", CommandActions.Extract)]
-        public bool IsDumpingMessageData { get; set; }
+        public DumpCommand DumpInfo { get; set; }
 
         [Command("/fetch", CommandActions.None, Default = "?")]
         public string FetchRevision { get; set; }

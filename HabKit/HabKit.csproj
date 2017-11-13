@@ -20,6 +20,14 @@
     <DefineConstants>RELEASE;NETCOREAPP2_0</DefineConstants>
   </PropertyGroup>
 
+  <ItemGroup Condition="'$(TargetFramework)'!='netcoreapp2.0'">
+    <Reference Include="netstandard" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="SixLabors.ImageSharp" Version="1.0.0-beta0001" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\Submodules\Flazzy\Flazzy\Flazzy.csproj" />
     <ProjectReference Include="..\Submodules\Sulakore\Sulakore\Sulakore.csproj" />

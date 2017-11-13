@@ -2,6 +2,7 @@
 using System.IO;
 using System.Net;
 using System.Linq;
+using System.Drawing;
 using System.Reflection;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
@@ -16,6 +17,8 @@ using Flazzy.Tags;
 
 using Sulakore.Habbo;
 using Sulakore.Habbo.Messages;
+
+using SixLabors.ImageSharp;
 
 namespace HabKit
 {
@@ -326,7 +329,7 @@ namespace HabKit
         }
         private void Extract()
         {
-            if (Options.IsDumpingMessageData || Options.MatchInfo != null)
+            if (Options.DumpInfo != null || Options.MatchInfo != null)
             {
                 Console.Write("Generating Message Hashes...");
                 Game.GenerateMessageHashes();
@@ -337,7 +340,7 @@ namespace HabKit
                 Out.Load(Game, hashesPath);
             }
 
-            if (Options.IsDumpingMessageData)
+            if (Options.DumpInfo != null)
             {
                 string msgsPath = Path.Combine(Options.OutputDirectory, "Messages.txt");
                 using (var msgsOutput = new StreamWriter(msgsPath, false))
@@ -356,13 +359,52 @@ namespace HabKit
                     Console.WriteLine("Messages Saved: " + msgsPath);
                 }
 
-                string headersPath = Path.Combine(Options.OutputDirectory, "Identities.ini");
-                using (var output = new StreamWriter(headersPath))
+                string identitiesPath = Path.Combine(Options.OutputDirectory, "Identities.ini");
+                using (var output = new StreamWriter(identitiesPath))
                 {
                     output.WriteLine(Game.Revision);
                     Out.Save(output);
                     output.WriteLine();
                     In.Save(output);
+                }
+
+                if (Options.DumpInfo.IsDumpingImages)
+                {
+                    var imgDirectory = Directory.CreateDirectory(Options.OutputDirectory + "\\ImageFiles");
+                    foreach (DefineBitsLossless2Tag bitsTag in Game.Tags
+                        .Where(t => t.Kind == TagKind.DefineBitsLossless2))
+                    {
+                        string imgPath = Path.Combine(imgDirectory.FullName, "img_" + bitsTag.Id + ".png");
+                        Color[,] table = bitsTag.GetARGBMap();
+
+                        int width = table.GetLength(0);
+                        int height = table.GetLength(1);
+                        using (var asset = new Image<Rgba32>(width, height))
+                        {
+                            for (int y = 0; y < height; y++)
+                            {
+                                for (int x = 0; x < width; x++)
+                                {
+                                    Color pixel = table[x, y];
+                                    asset[x, y] = new Rgba32(pixel.R, pixel.G, pixel.B, pixel.A);
+                                }
+                            }
+                            using (var output = new StreamWriter(imgPath))
+                            {
+                                asset.SaveAsPng(output.BaseStream);
+                            }
+                        }
+                    }
+                    if (Options.DumpInfo.IsDumpingBinaryData)
+                    {
+                        var binDirectory = Directory.CreateDirectory(Options.OutputDirectory + "\\BinaryDataFiles");
+                        foreach (DefineBinaryDataTag binTag in Game.Tags
+                            .Where(t => t.Kind == TagKind.DefineBinaryData))
+                        {
+                            string binPath = Path.Combine(binDirectory.FullName, "bin_" + binTag.Id + ".txt");
+                            File.WriteAllBytes(binPath, binTag.Data);
+                        }
+                    }
                 }
             }
 
