@@ -71,6 +71,9 @@ namespace HabKit.Utilities
         [Command("/binrep", CommandActions.Modify, MinParams = 2)]
         public BinRepCommand BinRepInfo { get; set; }
 
+        [Command("/imgrep", CommandActions.Modify, MinParams = 2)]
+        public ImgRepCommand ImgRepInfo { get; set; }
+
         [Command("/gamecenter", CommandActions.Modify)]
         public bool IsAddingBackGameCenter { get; set; }
 

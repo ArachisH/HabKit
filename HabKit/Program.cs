@@ -248,6 +248,29 @@ namespace HabKit
                 ConsoleEx.WriteLineFinished();
             }
 
+            if (Options.ImgRepInfo != null)
+            {
+                var toReplaceIds = string.Join(", ", Options.ImgRepInfo.Replacements.Keys);
+                Console.Write($"Replacing Images({toReplaceIds})...");
+
+                foreach (DefineBitsLossless2Tag defineBitsTag in Game.Tags
+                    .Where(t => t.Kind == TagKind.DefineBitsLossless2))
+                {
+                    Color[,] replacement = null;
+                    if (Options.ImgRepInfo.Replacements.TryGetValue(defineBitsTag.Id, out replacement))
+                    {
+                        defineBitsTag.SetARGBMap(replacement);
+                        Options.ImgRepInfo.Replacements.Remove(defineBitsTag.Id);
+                    }
+                }
+                if (Options.ImgRepInfo.Replacements.Count > 0)
+                {
+                    var failedReplaceIds = string.Join(", ", Options.ImgRepInfo.Replacements.Keys);
+                    Console.Write($" | Replacement Failed({failedReplaceIds})");
+                }
+                ConsoleEx.WriteLineFinished();
+            }
+
             if (Options.CleanInfo != null)
             {
                 Console.Write($"Sanitizing({Options.CleanInfo.Sanitizations})...");
@@ -395,36 +418,43 @@ namespace HabKit
                             }
                         }
                     }
-                    if (Options.DumpInfo.IsDumpingBinaryData)
+                }
+                if (Options.DumpInfo.IsDumpingBinaryData)
+                {
+                    var binDirectory = Directory.CreateDirectory(Options.OutputDirectory + "\\BinaryDataFiles");
+                    foreach (DefineBinaryDataTag binTag in Game.Tags
+                        .Where(t => t.Kind == TagKind.DefineBinaryData))
                     {
-                        var binDirectory = Directory.CreateDirectory(Options.OutputDirectory + "\\BinaryDataFiles");
-                        foreach (DefineBinaryDataTag binTag in Game.Tags
-                            .Where(t => t.Kind == TagKind.DefineBinaryData))
+                        string binPath = Path.Combine(binDirectory.FullName, "bin_" + binTag.Id + ".xml");
+                        if (Options.DumpInfo.IsMergingBinaryData)
                         {
-                            string binPath = Path.Combine(binDirectory.FullName, "bin_" + binTag.Id + ".txt");
-                            File.WriteAllBytes(binPath, binTag.Data);
+                            using (var binOutput = File.Open(Options.OutputDirectory + "\\binaryData.xml", FileMode.Append, FileAccess.Write))
+                            {
+                                binOutput.Write(binTag.Data, 0, binTag.Data.Length);
+                            }
                         }
+                        else File.WriteAllBytes(binPath, binTag.Data);
                     }
                 }
-            }
 
-            if (Options.MatchInfo != null)
-            {
-                MatchCommand matchInfo = Options.MatchInfo;
-                using (var previousGame = new HGame(matchInfo.PreviousGameInfo.FullName))
+                if (Options.MatchInfo != null)
                 {
-                    Console.Write("Preparing Hash Comparison...");
-                    previousGame.Disassemble();
-                    previousGame.GenerateMessageHashes();
-                    ConsoleEx.WriteLineFinished();
+                    MatchCommand matchInfo = Options.MatchInfo;
+                    using (var previousGame = new HGame(matchInfo.PreviousGameInfo.FullName))
+                    {
+                        Console.Write("Preparing Hash Comparison...");
+                        previousGame.Disassemble();
+                        previousGame.GenerateMessageHashes();
+                        ConsoleEx.WriteLineFinished();
 
-                    Console.Write("Matching Outgoing Messages...");
-                    ReplaceHeaders(matchInfo.ClientHeadersInfo, previousGame.OutMessages, previousGame.Revision);
-                    ConsoleEx.WriteLineFinished();
+                        Console.Write("Matching Outgoing Messages...");
+                        ReplaceHeaders(matchInfo.ClientHeadersInfo, previousGame.OutMessages, previousGame.Revision);
+                        ConsoleEx.WriteLineFinished();
 
-                    Console.Write("Matching Incoming Messages...");
-                    ReplaceHeaders(matchInfo.ServerHeadersInfo, previousGame.InMessages, previousGame.Revision);
-                    ConsoleEx.WriteLineFinished();
+                        Console.Write("Matching Incoming Messages...");
+                        ReplaceHeaders(matchInfo.ServerHeadersInfo, previousGame.InMessages, previousGame.Revision);
+                        ConsoleEx.WriteLineFinished();
+                    }
                 }
             }
         }
