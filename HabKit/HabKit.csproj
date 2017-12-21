@@ -12,12 +12,15 @@
     <AdvancedSettingsExpanded>False</AdvancedSettingsExpanded>
     <UpdateAssemblyFileVersion>True</UpdateAssemblyFileVersion>
     <UpdateAssemblyInfoVersion>False</UpdateAssemblyInfoVersion>
-    <AssemblyVersionSettings>None.IncrementOnDemandWithReset.Increment.None</AssemblyVersionSettings>
+    <AssemblyVersionSettings>None.IncrementOnDemandWithReset.None.None</AssemblyVersionSettings>
     <AssemblyFileVersionSettings>None.IncrementOnDemandWithReset.None.None</AssemblyFileVersionSettings>
   </PropertyGroup>
 
-  <PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|netcoreapp2.0|AnyCPU'">
-    <DefineConstants>RELEASE;NETCOREAPP2_0</DefineConstants>
+  <PropertyGroup Condition="'$(Configuration)'=='Release'">
+    <DefineConstants>RELEASE</DefineConstants>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(TargetFramework)'=='netcoreapp2.0'">
+    <DefineConstants>NETCOREAPP2_0</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup Condition="'$(TargetFramework)'!='netcoreapp2.0'">
@@ -25,18 +28,12 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="SixLabors.ImageSharp" Version="1.0.0-beta0001" />
+    <PackageReference Include="SixLabors.ImageSharp" Version="1.0.0-beta0002" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Submodules\Flazzy\Flazzy\Flazzy.csproj" />
     <ProjectReference Include="..\Submodules\Sulakore\Sulakore\Sulakore.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <None Update="Hashes.ini">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
   </ItemGroup>
 
 </Project>
