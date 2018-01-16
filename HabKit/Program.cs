@@ -7,8 +7,12 @@ namespace HabKit
 {
     public class Program
     {
+        public HOptions Options { get; }
+
         public Program(string[] args)
-        { }
+        {
+            Options = new HOptions(args);
+        }
         public static void Main(string[] args)
         {
             try
@@ -29,18 +33,18 @@ namespace HabKit
             Logger.AppendLine();
             Logger.AppendLine();
 
-            Logger.AppendLine("             ██╗  ██╗ █████╗ ██████╗ ██╗  ██╗██╗████████╗", ConsoleColor.DarkCyan);
-            Logger.AppendLine("             ██║  ██║██╔══██╗██╔══██╗██║ ██╔╝██║╚══██╔══╝", ConsoleColor.DarkCyan);
-            Logger.AppendLine("             ███████║███████║██████╔╝█████╔╝ ██║   ██║", ConsoleColor.DarkCyan);
-            Logger.AppendLine("             ██╔══██║██╔══██║██╔══██╗██╔═██╗ ██║   ██║", ConsoleColor.DarkCyan);
+            "             ██╗  ██╗ █████╗ ██████╗ ██╗  ██╗██╗████████╗".AppendLine(ConsoleColor.DarkCyan);
+            "             ██║  ██║██╔══██╗██╔══██╗██║ ██╔╝██║╚══██╔══╝".AppendLine(ConsoleColor.DarkCyan);
+            "             ███████║███████║██████╔╝█████╔╝ ██║   ██║".AppendLine(ConsoleColor.DarkCyan);
+            "             ██╔══██║██╔══██║██╔══██╗██╔═██╗ ██║   ██║".AppendLine(ConsoleColor.DarkCyan);
 
-            Logger.Append("             ██║  ██║██║  ██║██████╔╝██║  ██╗██║   ██║  [", ConsoleColor.DarkCyan);
-            Logger.Append("v" + Assembly.GetExecutingAssembly().GetName().Version);
-            Logger.AppendLine("]", ConsoleColor.DarkCyan);
+            "             ██║  ██║██║  ██║██████╔╝██║  ██╗██║   ██║  [".Append(ConsoleColor.DarkCyan);
+            ("v" + Assembly.GetExecutingAssembly().GetName().Version).Append();
+            "]".AppendLine(ConsoleColor.DarkCyan);
 
-            Logger.Append("             ╚═╝  ╚═╝╚═╝  ╚═╝╚═════╝ ╚═╝  ╚═╝╚═╝   ╚═╝  [", ConsoleColor.DarkCyan);
-            Logger.Append("https://www.GitHub.com/ArachisH/HabKit");
-            Logger.AppendLine("]", ConsoleColor.DarkCyan);
+            "             ╚═╝  ╚═╝╚═╝  ╚═╝╚═════╝ ╚═╝  ╚═╝╚═╝   ╚═╝  [".Append(ConsoleColor.DarkCyan);
+            "https://www.GitHub.com/ArachisH/HabKit".Append();
+            "]".AppendLine(ConsoleColor.DarkCyan);
 
             Logger.AppendLine();
             Logger.AppendLine();

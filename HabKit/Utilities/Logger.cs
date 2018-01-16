@@ -4,11 +4,11 @@ namespace HabKit.Utilities
 {
     public static class Logger
     {
-        public static void Append(object value)
+        public static void Append(this object value)
         {
             Append(value, Console.ForegroundColor);
         }
-        public static void Append(object value, ConsoleColor color)
+        public static void Append(this object value, ConsoleColor color)
         {
             ConsoleColor currentColor = Console.ForegroundColor;
             Console.ForegroundColor = color;
@@ -21,11 +21,11 @@ namespace HabKit.Utilities
         {
             AppendLine(null);
         }
-        public static void AppendLine(object value)
+        public static void AppendLine(this object value)
         {
             AppendLine(value, Console.ForegroundColor);
         }
-        public static void AppendLine(object value, ConsoleColor color)
+        public static void AppendLine(this object value, ConsoleColor color)
         {
             if (value != null)
             {
@@ -34,11 +34,11 @@ namespace HabKit.Utilities
             Console.WriteLine();
         }
 
-        public static void Write(object value)
+        public static void Write(this object value)
         {
             Write(value, Console.ForegroundColor);
         }
-        public static void Write(object value, ConsoleColor color)
+        public static void Write(this object value, ConsoleColor color)
         {
             Console.Write($"[{DateTime.Now:M/dd/yyyy hh:mm:ss tt}] ");
             Append(value, color);
@@ -48,11 +48,11 @@ namespace HabKit.Utilities
         {
             WriteLine(null);
         }
-        public static void WriteLine(object value)
+        public static void WriteLine(this object value)
         {
             WriteLine(value, Console.ForegroundColor);
         }
-        public static void WriteLine(object value, ConsoleColor color)
+        public static void WriteLine(this object value, ConsoleColor color)
         {
             if (value != null)
             {
