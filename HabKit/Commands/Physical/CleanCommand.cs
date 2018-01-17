@@ -1,4 +1,8 @@
-﻿using Sulakore.Habbo;
+﻿using System.Collections.Generic;
+
+using HabKit.Utilities;
+
+using Sulakore.Habbo;
 
 namespace HabKit.Commands.Physical
 {
@@ -14,14 +18,18 @@ namespace HabKit.Commands.Physical
         [PhysicalArgument("deobfuscate", Alias = 'd')]
         public bool IsDeobfuscating { get; }
 
-        protected override void Execute(ref HGame game)
+        public CleanCommand(HOptions options, Queue<string> arguments)
+            : base(options, arguments)
+        { }
+
+        protected override void Execute()
         {
             var sanitation = Sanitizers.None;
             if (IsDeobfuscating) sanitation |= Sanitizers.Deobfuscate;
             if (IsRenamingRegisters) sanitation |= Sanitizers.RegisterRename;
             if (IsRenamingIdentifiers) sanitation |= Sanitizers.IdentifierRename;
 
-            game.Sanitize(sanitation);
+            Game.Sanitize(sanitation);
         }
     }
 }
