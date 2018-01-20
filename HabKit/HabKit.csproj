@@ -16,13 +16,20 @@
     <AssemblyFileVersionSettings>None.IncrementOnDemandWithReset.None.None</AssemblyFileVersionSettings>
   </PropertyGroup>
 
-  <PropertyGroup Condition="'$(Configuration)'=='Release'">
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <Optimize>false</Optimize>
+    <DebugType>full</DebugType>
+    <Prefer32Bit>true</Prefer32Bit>
+    <DebugSymbols>true</DebugSymbols>
+    <DefineConstants>TRACE;DEBUG</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
     <DefineConstants>RELEASE</DefineConstants>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(TargetFramework)'=='netcoreapp2.0'">
-    <DefineConstants>NETCOREAPP2_0</DefineConstants>
-  </PropertyGroup>
+
   <PropertyGroup Condition="'$(TargetFramework)'!='netcoreapp2.0'">
+    <DefineConstants>NOT_CORE</DefineConstants>
     <TrimUnusedDependencies>true</TrimUnusedDependencies>
   </PropertyGroup>
 

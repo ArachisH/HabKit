@@ -7,11 +7,11 @@ namespace HabKit
 {
     public class Program
     {
-        public HOptions Options { get; }
+        public KitOptions Options { get; }
 
         public Program(string[] args)
         {
-            Options = new HOptions(args);
+            Options = new KitOptions(args);
         }
         public static void Main(string[] args)
         {
@@ -26,6 +26,7 @@ namespace HabKit
         private void Run()
         {
             WriteLogo();
+
             Console.ReadLine();
         }
         private void WriteLogo()
