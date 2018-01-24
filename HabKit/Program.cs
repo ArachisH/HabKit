@@ -2,11 +2,14 @@
 
 using System;
 using System.Reflection;
+using System.Threading.Tasks;
 
 namespace HabKit
 {
     public class Program
     {
+        private const ConsoleColor LOGO_COLOR = ConsoleColor.DarkRed;
+
         public KitOptions Options { get; }
 
         public Program(string[] args)
@@ -18,37 +21,45 @@ namespace HabKit
             try
             {
                 Console.CursorVisible = false;
-                new Program(args).Run();
+                new Program(args).RunAsync().Wait();
             }
             finally { Console.CursorVisible = true; }
         }
 
-        private void Run()
+        private async Task RunAsync()
         {
             WriteLogo();
 
+            await Options.ApplyAsync().ConfigureAwait(false);
+
             Console.ReadLine();
         }
+
         private void WriteLogo()
         {
             Logger.AppendLine();
             Logger.AppendLine();
 
-            "             ██╗  ██╗ █████╗ ██████╗ ██╗  ██╗██╗████████╗".AppendLine(ConsoleColor.DarkCyan);
-            "             ██║  ██║██╔══██╗██╔══██╗██║ ██╔╝██║╚══██╔══╝".AppendLine(ConsoleColor.DarkCyan);
-            "             ███████║███████║██████╔╝█████╔╝ ██║   ██║".AppendLine(ConsoleColor.DarkCyan);
-            "             ██╔══██║██╔══██║██╔══██╗██╔═██╗ ██║   ██║".AppendLine(ConsoleColor.DarkCyan);
-
-            "             ██║  ██║██║  ██║██████╔╝██║  ██╗██║   ██║  [".Append(ConsoleColor.DarkCyan);
-            ("v" + Assembly.GetExecutingAssembly().GetName().Version).Append();
-            "]".AppendLine(ConsoleColor.DarkCyan);
-
-            "             ╚═╝  ╚═╝╚═╝  ╚═╝╚═════╝ ╚═╝  ╚═╝╚═╝   ╚═╝  [".Append(ConsoleColor.DarkCyan);
-            "https://www.GitHub.com/ArachisH/HabKit".Append();
-            "]".AppendLine(ConsoleColor.DarkCyan);
+            "   ██╗  ██╗ █████╗ ██████╗ ██╗  ██╗██╗████████╗".AppendLine(LOGO_COLOR);
+            "   ██║  ██║██╔══██╗██╔══██╗██║ ██╔╝██║╚══██╔══╝".AppendLine(LOGO_COLOR);
+            "   ███████║███████║██████╔╝█████╔╝ ██║   ██║".AppendLine(LOGO_COLOR);
+            "   ██╔══██║██╔══██║██╔══██╗██╔═██╗ ██║   ██║".AppendLine(LOGO_COLOR);
+            "   ██║  ██║██║  ██║██████╔╝██║  ██╗██║   ██║".AppendLine(LOGO_COLOR);
+            "   ╚═╝  ╚═╝╚═╝  ╚═╝╚═════╝ ╚═╝  ╚═╝╚═╝   ╚═╝".Append(LOGO_COLOR);
+            new object[] { "\r\n   [", "https://www.GitHub.com/ArachisH/HabKit", "]" }.Append(LOGO_COLOR, null, LOGO_COLOR); // HMMMMMMMMMMMMMMMM
+            new object[] { " [", GetVersion(), "]" }.Append(LOGO_COLOR, null, LOGO_COLOR);
 
             Logger.AppendLine();
             Logger.AppendLine();
+        }
+        private string GetVersion()
+        {
+            string version = ("v" + Assembly.GetExecutingAssembly().GetName().Version.ToString());
+            while (version.EndsWith(".0"))
+            {
+                version = version.Substring(0, version.Length - 2);
+            }
+            return version;
         }
     }
 }

@@ -1,4 +1,6 @@
-﻿using System.IO;
+﻿using System;
+using System.IO;
+using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
 using System.Collections.Generic;
@@ -6,22 +8,18 @@ using System.Collections.Generic;
 using Flazzy;
 
 using Sulakore.Habbo;
-using System;
-using System.Linq;
 
 namespace HabKit.Utilities
 {
     public class KitOptions
     {
-        private readonly IDictionary<string, MethodInfo> _optionMethods;
-        private readonly IDictionary<string, PropertyInfo> _optionProperties;
+        private readonly SortedList<int, (MethodInfo method, object[] values)> _optionMethods;
 
         public HGame Game { get; set; }
 
         public KitOptions(string[] args)
         {
-            _optionMethods = GetOptionMembers(GetType().GetMethods());
-            _optionProperties = GetOptionMembers(GetType().GetProperties());
+            _optionMethods = new SortedList<int, (MethodInfo method, object[] values)>();
 
             var arguments = new Queue<string>(args);
             if (File.Exists(arguments.Peek()) && !arguments.Peek().StartsWith("-"))
@@ -29,50 +27,44 @@ namespace HabKit.Utilities
                 Game = new HGame(arguments.Dequeue());
             }
 
+            IDictionary<string, MethodInfo> methods = GetOptionMembers(GetType().GetMethods());
+            IDictionary<string, PropertyInfo> properties = GetOptionMembers(GetType().GetProperties());
             while (arguments.Count > 0)
             {
                 string argument = arguments.Dequeue();
-                if (_optionProperties.TryGetValue(argument, out PropertyInfo property))
+                if (properties.TryGetValue(argument, out PropertyInfo property))
                 {
                     object value = GetMemberValue(arguments, property.PropertyType, property.GetValue(this));
                     property.SetValue(this, value);
                 }
-                else if (_optionMethods.TryGetValue(argument, out MethodInfo method))
+                else if (methods.TryGetValue(argument, out MethodInfo method))
                 {
                     object[] values = GetMethodValues(arguments, method);
-                    method.Invoke(this, values);
+                    _optionMethods.Add(method.Name == nameof(FetchAsync) ? 0 : 1, (method, values));
                 }
             }
         }
 
         #region HabKit Options
-        #region Option Properties
-        [Option("output", "o")]
-        public string OutDirectory { get; set; }
-
-        [Option("revision", "r")]
-        public string RevisionOverride { get; set; }
-
-        [Option("compression", "c")]
-        public CompressionKind? Compression { get; set; }
-
-        [Option("match-index", "mi")]
-        public int MatchIndex { get; set; }
-
-        [Option("match-to-hashes", "mth")]
-        public bool IsMatchingToHashes { get; set; }
-
-        [Option("match-pattern", "mp")]
-        public string MatchPattern { get; set; } = @"(?<![a-zA-Z_-])-?[^\s\D][0-9]{0,3}(?=\D*$)";
-
-        [Option("match-no-comments", "mnc")]
-        public bool IsWritingMatchComments { get; set; } = true;
-        #endregion
         #region Option Methods
         [Option("fetch", "f")]
         public async Task FetchAsync(string revision = null)
         {
-            await Task.Delay(100);
+            for (int i = 0; i < 20; i++)
+            {
+
+            }
+
+            "[".Write(ConsoleColor.DarkCyan);
+            "--fetch".Append(ConsoleColor.White);
+            "]".Append(ConsoleColor.DarkCyan);
+
+            //"Fetching...".WriteLine(ConsoleColor.DarkCyan);
+
+            //await Task.Delay(5000);
+
+            //Logger.ClearLine(-1);
+            //"Fetched!".WriteLine(ConsoleColor.DarkCyan);
         }
 
         [Option("disable-crypto", "dc")]
@@ -119,15 +111,49 @@ namespace HabKit.Utilities
         public void EnableGameCenter()
         { }
 
-        [Option("clean")]
-        public void Clean(Sanitizers sanitation = Sanitizers.Deobfuscate | Sanitizers.RegisterRename | Sanitizers.IdentifierRename)
-        { }
-
         [Option("match", "m")]
         public void Match(string gamePath, string clientHeadersPath, string serverHeadersPath)
         { }
+
+        [Option("clean")]
+        public void Clean(Sanitizers sanitation = Sanitizers.Deobfuscate | Sanitizers.RegisterRename | Sanitizers.IdentifierRename)
+        { }
+        #endregion
+        #region Option Properties
+        [Option("output", "o")]
+        public string OutDirectory { get; set; }
+
+        [Option("revision", "r")]
+        public string RevisionOverride { get; set; }
+
+        [Option("compression", "c")]
+        public CompressionKind? Compression { get; set; }
+
+        [Option("match-index", "mi")]
+        public int MatchIndex { get; set; }
+
+        [Option("match-to-hashes", "mth")]
+        public bool IsMatchingToHashes { get; set; }
+
+        [Option("match-pattern", "mp")]
+        public string MatchPattern { get; set; } = @"(?<![a-zA-Z_-])-?[^\s\D][0-9]{0,3}(?=\D*$)";
+
+        [Option("match-no-comments", "mnc")]
+        public bool IsWritingMatchComments { get; set; } = true;
         #endregion
         #endregion
+
+        public async Task ApplyAsync()
+        {
+            foreach ((MethodInfo method, object[] values) in _optionMethods.Values)
+            {
+                object result = method.Invoke(this, values);
+                if (result is Task resultTask)
+                {
+                    await resultTask.ConfigureAwait(false);
+                }
+            }
+        }
 
         private IDictionary<string, T> GetOptionMembers<T>(T[] members) where T : MemberInfo
         {

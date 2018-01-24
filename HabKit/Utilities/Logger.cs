@@ -16,6 +16,13 @@ namespace HabKit.Utilities
             Console.Write(value);
             Console.ForegroundColor = currentColor;
         }
+        public static void Append(this object[] values, params ConsoleColor?[] colors)
+        {
+            for (int i = 0; i < values.Length; i++)
+            {
+                Append(values[i], colors[i] ?? Console.ForegroundColor);
+            }
+        }
 
         public static void AppendLine()
         {
@@ -40,7 +47,7 @@ namespace HabKit.Utilities
         }
         public static void Write(this object value, ConsoleColor color)
         {
-            Console.Write($"[{DateTime.Now:M/dd/yyyy hh:mm:ss tt}] ");
+            Console.Write(" ");
             Append(value, color);
         }
 
