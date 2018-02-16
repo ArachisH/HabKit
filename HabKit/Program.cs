@@ -1,8 +1,8 @@
-﻿using HabKit.Utilities;
-
-using System;
+﻿using System;
 using System.Reflection;
 using System.Threading.Tasks;
+
+using HabKit.Utilities;
 
 namespace HabKit
 {
@@ -30,7 +30,7 @@ namespace HabKit
         {
             WriteLogo();
 
-            await Options.ApplyAsync().ConfigureAwait(false);
+            await Task.Delay(100);
 
             Console.ReadLine();
         }
@@ -45,21 +45,11 @@ namespace HabKit
             "   ███████║███████║██████╔╝█████╔╝ ██║   ██║".AppendLine(LOGO_COLOR);
             "   ██╔══██║██╔══██║██╔══██╗██╔═██╗ ██║   ██║".AppendLine(LOGO_COLOR);
             "   ██║  ██║██║  ██║██████╔╝██║  ██╗██║   ██║".AppendLine(LOGO_COLOR);
-            "   ╚═╝  ╚═╝╚═╝  ╚═╝╚═════╝ ╚═╝  ╚═╝╚═╝   ╚═╝".Append(LOGO_COLOR);
-            new object[] { "\r\n   [", "https://www.GitHub.com/ArachisH/HabKit", "]" }.Append(LOGO_COLOR, null, LOGO_COLOR); // HMMMMMMMMMMMMMMMM
-            new object[] { " [", GetVersion(), "]" }.Append(LOGO_COLOR, null, LOGO_COLOR);
+            "   ╚═╝  ╚═╝╚═╝  ╚═╝╚═════╝ ╚═╝  ╚═╝╚═╝   ╚═╝ Version: ".Append(LOGO_COLOR);
+            Assembly.GetExecutingAssembly().GetName().Version.ToString(3).AppendLine();
 
             Logger.AppendLine();
             Logger.AppendLine();
-        }
-        private string GetVersion()
-        {
-            string version = ("v" + Assembly.GetExecutingAssembly().GetName().Version.ToString());
-            while (version.EndsWith(".0"))
-            {
-                version = version.Substring(0, version.Length - 2);
-            }
-            return version;
         }
     }
 }

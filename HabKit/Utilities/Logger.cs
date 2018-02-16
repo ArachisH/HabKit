@@ -47,7 +47,6 @@ namespace HabKit.Utilities
         }
         public static void Write(this object value, ConsoleColor color)
         {
-            Console.Write(" ");
             Append(value, color);
         }
 
