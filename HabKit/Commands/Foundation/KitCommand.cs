@@ -1,10 +1,10 @@
 ﻿using System;
 using System.Linq;
 using System.Reflection;
+using System.Threading.Tasks;
 using System.Collections.Generic;
 
 using HabKit.Utilities;
-using Sulakore.Habbo;
 
 namespace HabKit.Commands.Foundation
 {
@@ -12,15 +12,14 @@ namespace HabKit.Commands.Foundation
     {
         public KitOptions Options { get; }
 
-        private const BindingFlags BINDINGS = (BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Static | BindingFlags.Instance);
-
         public KitCommand(KitOptions options, Queue<string> arguments)
         {
             Options = options;
+            PopulateOrphans(arguments);
 
-            IDictionary<string, MethodInfo> methods = GetOptionMembers(GetType().GetMethods());
-            IDictionary<string, PropertyInfo> properties = GetOptionMembers(GetType().GetProperties());
-            while (arguments.Count > 0)
+            IDictionary<string, MethodInfo> methods = GetArgumentMembers(GetType().GetMethods());
+            IDictionary<string, PropertyInfo> properties = GetArgumentMembers(GetType().GetProperties());
+            while (arguments.Count > 0 && arguments.Peek().StartsWith("-"))
             {
                 string argument = arguments.Dequeue();
                 if (properties.TryGetValue(argument, out PropertyInfo property))
@@ -31,24 +30,29 @@ namespace HabKit.Commands.Foundation
                 else if (methods.TryGetValue(argument, out MethodInfo method))
                 {
                     object[] values = GetMethodValues(arguments, method);
-                   // _optionMethods.Add(method.Name == nameof(FetchAsync) ? 0 : 1, (method, values));
-                   // TODO: Put this in a dictionary or something, ye
+                    // _optionMethods.Add(method.Name == nameof(FetchAsync) ? 0 : 1, (method, values));
+                    // TODO: Put this in a dictionary or something, ye
                 }
             }
         }
 
-        private IDictionary<string, T> GetOptionMembers<T>(T[] members) where T : MemberInfo
+        public async Task ExecuteAsync()
+        {
+            await Task.Delay(100);
+        }
+
+        private IDictionary<string, T> GetArgumentMembers<T>(T[] members) where T : MemberInfo
         {
             var optionMembers = new Dictionary<string, T>();
             foreach (MemberInfo member in members)
             {
-                var optionAtt = member.GetCustomAttribute<KitArgumentAttribute>();
-                if (optionAtt == null) continue;
+                var argumentAtt = member.GetCustomAttribute<KitArgumentAttribute>();
+                if (argumentAtt == null || argumentAtt.OrphanIndex >= 0) continue;
 
-                optionMembers.Add("--" + optionAtt.Name, (T)member);
-                if (!string.IsNullOrWhiteSpace(optionAtt.Alias))
+                optionMembers.Add("--" + argumentAtt.Name, (T)member);
+                if (!string.IsNullOrWhiteSpace(argumentAtt.Alias))
                 {
-                    optionMembers.Add("-" + optionAtt.Alias, (T)member);
+                    optionMembers.Add("-" + argumentAtt.Alias, (T)member);
                 }
             }
             return optionMembers;
@@ -94,17 +98,41 @@ namespace HabKit.Commands.Foundation
                 return Enum.Parse(memberType, argument, true);
             }
 
-            TypeCode code = Type.GetTypeCode(memberType);
-            if (code == TypeCode.Boolean)
+            switch (Type.GetTypeCode(memberType))
             {
-                return !((bool)value);
+                case TypeCode.Boolean: return !(bool)value;
+                case TypeCode.String: return DequeOrDefault(arguments, value);
+                case TypeCode.Int32: return Convert.ToInt32(DequeOrDefault(arguments, value));
             }
-            else if (arguments.Count == 0 || arguments.Peek().StartsWith("-")) return value;
+            return value;
+        }
 
-            switch (code)
+        private void PopulateOrphans(Queue<string> arguments)
+        {
+            IEnumerable<MemberInfo> members = GetType().GetProperties().Cast<MemberInfo>().Concat(GetType().GetMethods());
+            foreach (MemberInfo member in members)
             {
-                case TypeCode.String: return arguments.Dequeue();
-                case TypeCode.Int32: return int.Parse(arguments.Dequeue());
+                var argumentAtt = member.GetCustomAttribute<KitArgumentAttribute>();
+                if (argumentAtt == null || argumentAtt.OrphanIndex < 0) continue;
+
+                if (member is PropertyInfo property)
+                {
+                    object value = GetMemberValue(arguments, property.PropertyType, null);
+                    property.SetValue(this, value);
+                }
+                else if (member is MethodInfo method)
+                { }
+            }
+        }
+        private object DequeOrDefault(Queue<string> arguments, object value = null)
+        {
+            if (arguments.Count > 0)
+            {
+                string argument = arguments.Peek();
+                if (!argument.StartsWith("-"))
+                {
+                    return arguments.Dequeue();
+                }
             }
             return value;
         }
