@@ -1,21 +1,14 @@
-﻿using System.Collections.Generic;
-
-using HabKit.Utilities;
-using HabKit.Commands.Foundation;
+﻿using HabKit.Commands.Foundation;
 
 using Sulakore.Habbo;
 
 namespace HabKit.Commands
 {
     [KitCommand("patch")]
-    public class PatchCommand : KitCommand
+    public class PatchCommand
     {
         [KitArgument(0)]
-        public HGame Game { get; }
-
-        public PatchCommand(KitOptions options, Queue<string> arguments)
-            : base(options, arguments)
-        { }
+        public HGame Game { get; set; }
 
         [KitArgument("disable-crypto", "dc")]
         public void DisableCrypto()
