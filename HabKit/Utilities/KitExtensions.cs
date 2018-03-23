@@ -17,16 +17,34 @@ namespace HabKit.Utilities
         }
         public static void PopulateMembers(this object instance, Queue<string> arguments, out List<(MethodInfo, object[])> methods)
         {
+            var orphans = new SortedList<int, PropertyInfo>();
             var members = new Dictionary<string, MemberInfo>();
             foreach (MemberInfo member in instance.GetType().GetAllMembers())
             {
                 var kitArgumentAtt = member.GetCustomAttribute<KitArgumentAttribute>();
                 if (kitArgumentAtt == null) continue;
 
-                members.Add("--" + kitArgumentAtt.Name, member);
-                if (!string.IsNullOrWhiteSpace(kitArgumentAtt.Alias))
+                if (kitArgumentAtt.OrphanIndex < 0)
                 {
-                    members.Add('-' + kitArgumentAtt.Alias, member);
+                    members.Add("--" + kitArgumentAtt.Name, member);
+                    if (!string.IsNullOrWhiteSpace(kitArgumentAtt.Alias))
+                    {
+                        members.Add('-' + kitArgumentAtt.Alias, member);
+                    }
+                }
+                else orphans.Add(kitArgumentAtt.OrphanIndex, (PropertyInfo)member);
+            }
+
+            foreach (PropertyInfo orphan in orphans.Values)
+            {
+                if (orphan.PropertyType == typeof(HGame))
+                {
+                    var fileName = (string)DequeOrDefault(arguments);
+                    if (string.IsNullOrWhiteSpace(fileName))
+                    {
+                        // Where do we pull the HGame object from, should we just await in this method and mark it async?
+                    }
+                    else orphan.SetValue(instance, new HGame(fileName));
                 }
             }
 
@@ -106,23 +124,5 @@ namespace HabKit.Utilities
             }
             return value;
         }
-
-        //private static void PopulateOrphans(Queue<string> arguments)
-        //{
-        //    IEnumerable<MemberInfo> members = GetType().GetProperties().Cast<MemberInfo>().Concat(GetType().GetMethods());
-        //    foreach (MemberInfo member in members)
-        //    {
-        //        var argumentAtt = member.GetCustomAttribute<KitArgumentAttribute>();
-        //        if (argumentAtt == null || argumentAtt.OrphanIndex < 0) continue;
-
-        //        if (member is PropertyInfo property)
-        //        {
-        //            object value = GetMemberValue(arguments, property.PropertyType, null);
-        //            property.SetValue(this, value);
-        //        }
-        //        else if (member is MethodInfo method)
-        //        { }
-        //    }
-        //}
     }
 }

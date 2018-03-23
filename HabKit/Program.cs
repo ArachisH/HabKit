@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
 using System.Collections.Generic;
@@ -13,9 +14,7 @@ namespace HabKit
         private static readonly Dictionary<string, Type> _commandTypes;
 
         [KitArgument("output", "o")]
-        public string OutputDirectory { get; set; } = Environment.CurrentDirectory;
-
-        public static Program Current { get; private set; }
+        public static string OutputDirectory { get; private set; } = Environment.CurrentDirectory;
 
         static Program()
         {
@@ -34,25 +33,28 @@ namespace HabKit
         {
             var arguments = new Queue<string>(args);
 
-            Current = new Program();
-            Current.PopulateMembers(arguments);
-            Current.RunAsync(arguments).GetAwaiter().GetResult();
+            var app = new Program();
+            app.PopulateMembers(arguments);
+            app.RunAsync(arguments).GetAwaiter().GetResult();
         }
 
         private async Task RunAsync(Queue<string> arguments)
         {
-            while (arguments.Count > 0)
-            {
-                Type commandType = _commandTypes[arguments.Dequeue()];
-                var command = Activator.CreateInstance(commandType);
+            Type commandType = _commandTypes[arguments.Dequeue()];
+            var command = Activator.CreateInstance(commandType);
 
-                command.PopulateMembers(arguments, out List<(MethodInfo, object[])> methods);
-                foreach ((MethodInfo method, object[] values) in methods)
+            command.PopulateMembers(arguments, out List<(MethodInfo, object[])> methods);
+            foreach ((MethodInfo method, object[] values) in methods)
+            {
+                object result = method.Invoke(command, values);
+                if (result is Task resultTask)
                 {
-                    object result = method.Invoke(command, values);
-                    if (result is Task resultTask)
+                    await resultTask.ConfigureAwait(false);
+                    Type genericType = result.GetType().GenericTypeArguments.FirstOrDefault();
+                    if (genericType != null)
                     {
-                        await resultTask.ConfigureAwait(false);
+                        var resultProperty = typeof(Task<>).MakeGenericType(genericType).GetProperty("Result");
+                        result = resultProperty.GetValue(resultTask);
                     }
                 }
             }

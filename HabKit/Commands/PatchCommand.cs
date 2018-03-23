@@ -10,6 +10,9 @@ namespace HabKit.Commands
         [KitArgument(0)]
         public HGame Game { get; set; }
 
+        [KitArgument(1)]
+        public string Testing { get; set; }
+
         [KitArgument("disable-crypto", "dc")]
         public void DisableCrypto()
         { }
@@ -19,7 +22,7 @@ namespace HabKit.Commands
         { }
 
         [KitArgument("enable-game-center", "egc")]
-        public void EnableGameCenterIcon()
+        public void EnableGameCenter()
         { }
 
         [KitArgument("inject-key-shouter", "iks")]
