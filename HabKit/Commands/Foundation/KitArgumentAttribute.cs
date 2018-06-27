@@ -5,13 +5,13 @@ namespace HabKit.Commands.Foundation
     [AttributeUsage(AttributeTargets.Property | AttributeTargets.Method)]
     public class KitArgumentAttribute : Attribute
     {
+        public char Alias { get; }
         public string Name { get; }
-        public string Alias { get; }
-        public int OrphanIndex { get; } = -1;
+        public KitPermissions Permissions { get; }
 
-        public KitArgumentAttribute(string name)
-            : this(name, null)
-        { }
+        public int OrphanIndex { get; } = -1;
+        public int MethodOrder { get; set; } = -1;
+
         public KitArgumentAttribute(int orphanIndex)
         {
             if (orphanIndex < 0)
@@ -20,9 +20,14 @@ namespace HabKit.Commands.Foundation
             }
             OrphanIndex = orphanIndex;
         }
-        public KitArgumentAttribute(string name, string alias)
+        public KitArgumentAttribute(KitPermissions permissions, string name)
         {
             Name = name;
+            Permissions = permissions;
+        }
+        public KitArgumentAttribute(KitPermissions permissions, string name, char alias)
+            : this(permissions, name)
+        {
             Alias = alias;
         }
     }

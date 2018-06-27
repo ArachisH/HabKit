@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Collections.Generic;
@@ -11,14 +12,19 @@ namespace HabKit.Utilities
 {
     public static class KitExtensions
     {
+        public static void WriteResult(this bool value)
+        {
+            KitLogger.WriteLine("X", (value ? ConsoleColor.Green : ConsoleColor.Red));
+        }
+
         public static void PopulateMembers(this object instance, Queue<string> arguments)
         {
             PopulateMembers(instance, arguments, out List<(MethodInfo, object[])> methods);
         }
         public static void PopulateMembers(this object instance, Queue<string> arguments, out List<(MethodInfo, object[])> methods)
         {
-            var orphans = new SortedList<int, PropertyInfo>();
             var members = new Dictionary<string, MemberInfo>();
+            var orphanProperties = new SortedList<int, PropertyInfo>();
             foreach (MemberInfo member in instance.GetType().GetAllMembers())
             {
                 var kitArgumentAtt = member.GetCustomAttribute<KitArgumentAttribute>();
@@ -27,24 +33,28 @@ namespace HabKit.Utilities
                 if (kitArgumentAtt.OrphanIndex < 0)
                 {
                     members.Add("--" + kitArgumentAtt.Name, member);
-                    if (!string.IsNullOrWhiteSpace(kitArgumentAtt.Alias))
+                    if (!char.IsWhiteSpace(kitArgumentAtt.Alias) && kitArgumentAtt.Alias != '\0')
                     {
-                        members.Add('-' + kitArgumentAtt.Alias, member);
+                        members.Add("-" + kitArgumentAtt.Alias, member);
                     }
                 }
-                else orphans.Add(kitArgumentAtt.OrphanIndex, (PropertyInfo)member);
+                else orphanProperties.Add(kitArgumentAtt.OrphanIndex, (PropertyInfo)member);
             }
 
-            foreach (PropertyInfo orphan in orphans.Values)
+            foreach (PropertyInfo orphan in orphanProperties.Values)
             {
                 if (orphan.PropertyType == typeof(HGame))
                 {
                     var fileName = (string)DequeOrDefault(arguments);
-                    if (string.IsNullOrWhiteSpace(fileName))
+                    if (!string.IsNullOrWhiteSpace(fileName))
                     {
-                        // Where do we pull the HGame object from, should we just await in this method and mark it async?
+                        orphan.SetValue(instance, new HGame(Path.GetFullPath(fileName)));
                     }
-                    else orphan.SetValue(instance, new HGame(fileName));
+                }
+                else
+                {
+                    object value = GetMemberValue(arguments, orphan.PropertyType, orphan.GetValue(instance));
+                    orphan.SetValue(instance, value);
                 }
             }
 
@@ -61,7 +71,11 @@ namespace HabKit.Utilities
                 else if (member is MethodInfo method)
                 {
                     object[] values = GetMethodValues(arguments, method);
-                    methods.Add((method, values));
+
+                    var kitArgumentAtt = member.GetCustomAttribute<KitArgumentAttribute>();
+                    int index = (kitArgumentAtt.MethodOrder < 0 ? methods.Count : kitArgumentAtt.MethodOrder);
+
+                    methods.Insert(index, (method, values));
                 }
             }
         }

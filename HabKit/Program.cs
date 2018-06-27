@@ -1,6 +1,7 @@
 ﻿using System;
-using System.Linq;
+using System.IO;
 using System.Reflection;
+using System.Diagnostics;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 
@@ -13,7 +14,9 @@ namespace HabKit
     {
         private static readonly Dictionary<string, Type> _commandTypes;
 
-        [KitArgument("output", "o")]
+        private const ConsoleColor LOGO_COLOR = ConsoleColor.DarkRed;
+
+        [KitArgument(KitPermissions.None, "output", 'o')]
         public static string OutputDirectory { get; private set; } = Environment.CurrentDirectory;
 
         static Program()
@@ -29,35 +32,45 @@ namespace HabKit
                 _commandTypes.Add(kitCommandAtt.Name, assemblyType);
             }
         }
-        public static void Main(string[] args)
+        public Program(Queue<string> arguments)
         {
-            var arguments = new Queue<string>(args);
-
-            var app = new Program();
-            app.PopulateMembers(arguments);
-            app.RunAsync(arguments).GetAwaiter().GetResult();
+            this.PopulateMembers(arguments);
         }
 
-        private async Task RunAsync(Queue<string> arguments)
+        public static void Main(string[] args)
         {
-            Type commandType = _commandTypes[arguments.Dequeue()];
-            var command = Activator.CreateInstance(commandType);
-
-            command.PopulateMembers(arguments, out List<(MethodInfo, object[])> methods);
-            foreach ((MethodInfo method, object[] values) in methods)
+            try
             {
-                object result = method.Invoke(command, values);
-                if (result is Task resultTask)
-                {
-                    await resultTask.ConfigureAwait(false);
-                    Type genericType = result.GetType().GenericTypeArguments.FirstOrDefault();
-                    if (genericType != null)
-                    {
-                        var resultProperty = typeof(Task<>).MakeGenericType(genericType).GetProperty("Result");
-                        result = resultProperty.GetValue(resultTask);
-                    }
-                }
+                KitLogger.SetCursorVisibility(false);
+                var arguments = new Queue<string>(args);
+
+                var app = new Program(arguments);
+                Directory.CreateDirectory(OutputDirectory);
+
+                app.RunAsync(arguments).GetAwaiter().GetResult();
             }
+            finally { KitLogger.SetCursorVisibility(true); }
+        }
+
+        private Task RunAsync(Queue<string> arguments)
+        {
+            KitLogger.WriteLine();
+            "   ██╗  ██╗ █████╗ ██████╗ ██╗  ██╗██╗████████╗".WriteLine(LOGO_COLOR);
+            "   ██║  ██║██╔══██╗██╔══██╗██║ ██╔╝██║╚══██╔══╝".WriteLine(LOGO_COLOR);
+            "   ███████║███████║██████╔╝█████╔╝ ██║   ██║".WriteLine(LOGO_COLOR);
+            "   ██╔══██║██╔══██║██╔══██╗██╔═██╗ ██║   ██║".WriteLine(LOGO_COLOR);
+            "   ██║  ██║██║  ██║██████╔╝██║  ██╗██║   ██║".WriteLine(LOGO_COLOR);
+            "   ╚═╝  ╚═╝╚═╝  ╚═╝╚═════╝ ╚═╝  ╚═╝╚═╝   ╚═╝".WriteLine(LOGO_COLOR);
+            KitLogger.WriteLine();
+
+            ("Version: ", FileVersionInfo.GetVersionInfo(Assembly.GetExecutingAssembly().Location).FileVersion).WriteLine(null, ConsoleColor.White);
+            ("Output Directory: ", OutputDirectory).WriteLine(null, ConsoleColor.White);
+            KitLogger.WriteLine();
+
+            Type commandType = _commandTypes[arguments.Dequeue()];
+            var command = (KitCommand)Activator.CreateInstance(commandType, arguments);
+
+            return command.ExecuteAsync();
         }
     }
 }
