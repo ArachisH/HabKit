@@ -1,9 +1,9 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
-    <TargetFrameworks>netcoreapp2.0;net471</TargetFrameworks>
+    <TargetFrameworks>netcoreapp2.1;net471</TargetFrameworks>
   </PropertyGroup>
 
   <PropertyGroup>
@@ -28,23 +28,23 @@
     <DefineConstants>RELEASE</DefineConstants>
   </PropertyGroup>
 
-  <PropertyGroup Condition="'$(TargetFramework)'!='netcoreapp2.0'">
+  <PropertyGroup Condition="'$(TargetFramework)'!='netcoreapp2.1'">
     <DefineConstants>NOT_CORE</DefineConstants>
     <TrimUnusedDependencies>true</TrimUnusedDependencies>
   </PropertyGroup>
 
-  <ItemGroup Condition="'$(TargetFramework)'!='netcoreapp2.0'">
+  <ItemGroup Condition="'$(TargetFramework)'!='netcoreapp2.1'">
     <Reference Include="netstandard" />
-    <PackageReference Include="Microsoft.Packaging.Tools.Trimming" Version="1.1.0-preview1-25818-01" />
+    <PackageReference Include="Microsoft.Packaging.Tools.Trimming" Version="1.1.0-preview1-26619-01" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(TargetFramework)'=='netcoreapp2.0'">
-    <PackageReference Include="SixLabors.ImageSharp" Version="1.0.0-beta0002" />
+  <ItemGroup Condition="'$(TargetFramework)'=='netcoreapp2.1'">
+    <PackageReference Include="SixLabors.ImageSharp" Version="1.0.0-beta0004" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Submodules\Sulakore\Submodules\Flazzy\Flazzy\Flazzy.csproj" />
     <ProjectReference Include="..\Submodules\Sulakore\Sulakore\Sulakore.csproj" />
+    <ProjectReference Include="..\Submodules\Sulakore\Submodules\Flazzy\Flazzy\Flazzy.csproj" />
   </ItemGroup>
 
   <ItemGroup>
