@@ -7,7 +7,7 @@ namespace HabKit.Commands.Foundation
     {
         public char Alias { get; }
         public string Name { get; }
-        public KitPermissions Permissions { get; }
+        public KitAction Action { get; }
 
         public int OrphanIndex { get; } = -1;
         public int MethodOrder { get; set; } = -1;
@@ -20,13 +20,13 @@ namespace HabKit.Commands.Foundation
             }
             OrphanIndex = orphanIndex;
         }
-        public KitArgumentAttribute(KitPermissions permissions, string name)
+        public KitArgumentAttribute(KitAction action, string name)
         {
             Name = name;
-            Permissions = permissions;
+            Action = action;
         }
-        public KitArgumentAttribute(KitPermissions permissions, string name, char alias)
-            : this(permissions, name)
+        public KitArgumentAttribute(KitAction action, string name, char alias)
+            : this(action, name)
         {
             Alias = alias;
         }

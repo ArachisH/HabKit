@@ -14,7 +14,7 @@ namespace HabKit.Utilities
     {
         public static void WriteResult(this bool value)
         {
-            KitLogger.WriteLine("X", (value ? ConsoleColor.Green : ConsoleColor.Red));
+            KitLogger.WriteLine(value ? "Success!" : "Failed!", (value ? ConsoleColor.Green : ConsoleColor.Red));
         }
 
         public static void PopulateMembers(this object instance, Queue<string> arguments)

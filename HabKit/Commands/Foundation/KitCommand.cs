@@ -1,4 +1,5 @@
-﻿using System.Reflection;
+﻿using System;
+using System.Reflection;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 
@@ -8,51 +9,53 @@ namespace HabKit.Commands.Foundation
 {
     public abstract class KitCommand
     {
-        private readonly KitPermissions _permissions;
-        private readonly Dictionary<KitPermissions, List<(MethodInfo, object[])>> _methods;
+        private readonly SortedDictionary<KitAction, List<(MethodInfo, object[])>> _methods;
 
         public KitCommand(Queue<string> arguments)
         {
-            _methods = new Dictionary<KitPermissions, List<(MethodInfo, object[])>>();
+            _methods = new SortedDictionary<KitAction, List<(MethodInfo, object[])>>();
 
             this.PopulateMembers(arguments, out List<(MethodInfo, object[])> methods);
             foreach ((MethodInfo method, object[] values) item in methods)
             {
                 var kitArgumentAtt = item.method.GetCustomAttribute<KitArgumentAttribute>();
-                if (!_methods.TryGetValue(kitArgumentAtt.Permissions, out List<(MethodInfo, object[])> group))
+                if (!_methods.TryGetValue(kitArgumentAtt.Action, out List<(MethodInfo, object[])> group))
                 {
                     group = new List<(MethodInfo, object[])>();
-                    _methods.Add(kitArgumentAtt.Permissions, group);
+                    _methods.Add(kitArgumentAtt.Action, group);
                 }
+
                 group.Add(item);
-                _permissions |= kitArgumentAtt.Permissions;
             }
         }
 
-        public async Task ExecuteAsync()
+        public virtual async Task ExecuteAsync()
         {
-            foreach (KitPermissions permission in _methods.Keys)
+            foreach (KitAction action in _methods.Keys)
             {
-
+                WriteActionTitle(action);
+                foreach ((MethodInfo method, object[] values) in _methods[action])
+                {
+                    object result = method.Invoke(this, values);
+                    if (result is Task resultTask)
+                    {
+                        await resultTask.ConfigureAwait(false);
+                    }
+                }
             }
-
-            if (_methods.TryGetValue(KitPermissions.None, out List<(MethodInfo, object[])> methods))
-            {
-
-            }
-
-            //foreach ((MethodInfo method, object[] values) in _methods)
-            //{
-            //    object result = method.Invoke(this, values);
-            //    if (result is Task resultTask)
-            //    {
-            //        await resultTask.ConfigureAwait(false);
-            //    }
-            //}
         }
-        protected virtual async Task PrepareAsync(KitPermissions requestedPermission)
-        {
 
+        private void WriteActionTitle(KitAction action)
+        {
+            switch (action)
+            {
+                case KitAction.Modify:
+                ("=====[ ", "Modifying", " ]=====").WriteLine(null, ConsoleColor.Cyan, null);
+                break;
+                case KitAction.Inspect:
+                ("=====[ ", "Inspecting", " ]=====").WriteLine(null, ConsoleColor.Cyan, null);
+                break;
+            }
         }
     }
 }

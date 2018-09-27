@@ -27,25 +27,28 @@ namespace HabKit.Commands
         { }
 
         #region Command Methods
-        [KitArgument(KitPermissions.Modify, "disable-crypto")]
+        [KitArgument(KitAction.Modify, "disable-crypto")]
         private void DisableCrypto()
-        { }
-
-        [KitArgument(KitPermissions.Modify, "disable-host-checks")]
-        private void DisableHostChecks()
         {
-            ("Disabling Host Checks > ").Write();
-            Game.DisableHostChecks().WriteResult();
-
-            //KitLogger.ClearLine(leftOffset: Console.CursorLeft - 3);
-            //("true").WriteLine();
+            ("Disabling Crypto >> ").Write();
+            Game.DisableHandshake().WriteResult();
         }
 
-        [KitArgument(KitPermissions.Modify, "enable-game-center")]
-        private void EnableGameCenter()
-        { }
+        [KitArgument(KitAction.Modify, "disable-host-checks")]
+        private void DisableHostChecks()
+        {
+            ("Disabling Host Checks >> ").Write();
+            Game.DisableHostChecks().WriteResult();
+        }
 
-        [KitArgument(KitPermissions.None, "fetch", 'f')]
+        [KitArgument(KitAction.Modify, "enable-game-center")]
+        private void EnableGameCenter()
+        {
+            ("Enabling Game Center >> ").Write();
+            Game.EnableGameCenterIcon().WriteResult();
+        }
+
+        [KitArgument(KitAction.None, "fetch", 'f')]
         public async Task FetchAsync(string revision = null)
         {
             if (string.IsNullOrWhiteSpace(revision))
@@ -56,7 +59,7 @@ namespace HabKit.Commands
             string fileName = Path.Combine(Program.OutputDirectory, "gordon", revision, "Habbo.swf");
             Directory.CreateDirectory(Path.GetDirectoryName(fileName));
 
-            ("Fetching Client > ", $@"\gordon\{revision}\Habbo.swf", " | ").Write(null, ConsoleColor.Yellow, null);
+            ("Fetching Client >> ", $@"\gordon\{revision}\Habbo.swf", " | ").Write(null, ConsoleColor.Yellow, null);
             await HAPI.DownloadGameAsync(revision, fileName, ReportFetchProgress).ConfigureAwait(false);
             KitLogger.WriteLine();
             KitLogger.WriteLine();
@@ -65,51 +68,66 @@ namespace HabKit.Commands
             ProcessGame(Game);
         }
 
-        [KitArgument(KitPermissions.Modify, "inject-key-shouter")]
+        [KitArgument(KitAction.Modify, "inject-key-shouter")]
         private void InjectKeyShouter(int messageId = 4001)
-        { }
+        {
+            ("Injecting Key Shouter >> ").Write();
+            Game.InjectKeyShouter(messageId).WriteResult();
+        }
 
-        [KitArgument(KitPermissions.Modify, "inject-raw-camera")]
+        [KitArgument(KitAction.Modify, "inject-raw-camera")]
         private void InjectRawCamera()
-        { }
+        {
+            ("Injecting Raw Camera >> ").Write();
+            Game.InjectRawCamera().WriteResult();
+        }
 
-        [KitArgument(KitPermissions.Modify, "inject-rsa")]
+        [KitArgument(KitAction.Modify, "inject-rsa")]
         private void InjectRSAKeys(params string[] values)
-        { }
+        {
+            ("Injecting RSA Keys >> ").Write();
+            true.WriteResult();
+        }
 
-        [KitArgument(KitPermissions.Modify, "replace-binaries")]
+        [KitArgument(KitAction.Modify, "replace-binaries")]
         private void ReplaceBinaries()
-        { }
+        {
+            ("Replacing Binaries >> ").Write();
+            true.WriteResult();
+        }
 
-        [KitArgument(KitPermissions.Modify, "replace-images")]
+        [KitArgument(KitAction.Modify, "replace-images")]
         private void ReplaceImages()
-        { }
+        {
+            ("Replacing Images >> ").Write();
+            true.WriteResult();
+        }
         #endregion
 
-        //public override async Task ExecuteAsync()
-        //{
-        //    if (Game != null)
-        //    {
-        //        ProcessGame(Game);
-        //    }
+        public override async Task ExecuteAsync()
+        {
+            if (Game != null)
+            {
+                ProcessGame(Game);
+            }
 
-        //    await base.ExecuteAsync().ConfigureAwait(false);
-        //    //using (var asmdStream = File.Create(Path.Combine(Program.OutputDirectory, "asmd_Habbo.swf")))
-        //    //{
-        //    //    Game.CopyTo(asmdStream, Flazzy.CompressionKind.ZLIB);
-        //    //}
-        //}
+            await base.ExecuteAsync().ConfigureAwait(false);
+
+            //using (var asmdStream = File.Create(Path.Combine(Program.OutputDirectory, "asmd_Habbo.swf")))
+            //{
+            //    Game.CopyTo(asmdStream, Flazzy.CompressionKind.ZLIB);
+            //}
+        }
 
         private void ProcessGame(HGame game)
         {
             ("=====[ ", "Disassembling", " ]=====").WriteLine(null, ConsoleColor.Cyan, null);
-            KitLogger.WriteLine();
             Game.Disassemble(true);
 
             ("Images: ", Game.Tags.Count(t => t.Kind == TagKind.DefineBitsLossless2).ToString("n0")).WriteLine(null, ConsoleColor.White);
-            ("Binary Data: ", Game.Tags.Count(t => t.Kind == TagKind.DefineBinaryData).ToString("n0")).WriteLine(null, ConsoleColor.White);
-            ("Incoming Message: ", Game.InMessages.Count.ToString("n0")).WriteLine(null, ConsoleColor.White);
-            ("Outgoing Message: ", Game.OutMessages.Count.ToString("n0")).WriteLine(null, ConsoleColor.White);
+            ("Binaries: ", Game.Tags.Count(t => t.Kind == TagKind.DefineBinaryData).ToString("n0")).WriteLine(null, ConsoleColor.White);
+            ("Incoming Messages: ", Game.InMessages.Count.ToString("n0")).WriteLine(null, ConsoleColor.White);
+            ("Outgoing Messages: ", Game.OutMessages.Count.ToString("n0")).WriteLine(null, ConsoleColor.White);
             ("Revision: ", Game.Revision).WriteLine(null, ConsoleColor.White);
 
             KitLogger.WriteLine();
