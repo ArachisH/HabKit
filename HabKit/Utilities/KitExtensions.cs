@@ -58,11 +58,18 @@ namespace HabKit.Utilities
                 }
             }
 
+            var invalidArgs = new List<string>();
             methods = new List<(MethodInfo, object[])>();
-            while (arguments.Count > 0 && arguments.Peek().StartsWith("-"))
+            while (arguments.Count > 0 && !invalidArgs.Contains(arguments.Peek()) && arguments.Peek().StartsWith("-"))
             {
                 string argument = arguments.Dequeue();
-                MemberInfo member = members[argument];
+                if (!members.TryGetValue(argument, out MemberInfo member))
+                {
+                    arguments.Enqueue(argument);
+                    invalidArgs.Add(argument);
+                    continue;
+                }
+
                 if (member is PropertyInfo property)
                 {
                     object value = GetMemberValue(arguments, property.PropertyType, property.GetValue(instance));
