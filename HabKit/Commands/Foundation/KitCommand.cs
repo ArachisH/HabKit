@@ -29,20 +29,35 @@ namespace HabKit.Commands.Foundation
             }
         }
 
-        public virtual async Task ExecuteAsync()
+        public virtual async Task<bool> ExecuteAsync()
         {
+            bool modified = false;
             foreach (KitAction action in _methods.Keys)
             {
                 WriteActionTitle(action);
                 foreach ((MethodInfo method, object[] values) in _methods[action])
                 {
-                    object result = method.Invoke(this, values);
-                    if (result is Task resultTask)
+                    try
                     {
-                        await resultTask.ConfigureAwait(false);
+                        object result = method.Invoke(this, values);
+                        if (result is Task resultTask)
+                        {
+                            await resultTask.ConfigureAwait(false);
+                        }
+                        else if (result is bool resultBoolean && action == KitAction.Modify)
+                        {
+                            modified = true;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine();
+                        (ex.InnerException ?? ex).WriteLine(ConsoleColor.Red);
+                        Console.WriteLine();
                     }
                 }
             }
+            return modified;
         }
 
         private void WriteActionTitle(KitAction action)

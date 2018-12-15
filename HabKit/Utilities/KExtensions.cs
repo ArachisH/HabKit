@@ -7,14 +7,16 @@ using System.Collections.Generic;
 using HabKit.Commands.Foundation;
 
 using Sulakore.Habbo;
+using Sulakore.Habbo.Web;
 
 namespace HabKit.Utilities
 {
-    public static class KitExtensions
+    public static class KExtensions
     {
-        public static void WriteResult(this bool value)
+        public static bool WriteResult(this bool value)
         {
-            KitLogger.WriteLine(value ? "Success!" : "Failed!", (value ? ConsoleColor.Green : ConsoleColor.Red));
+            KLogger.WriteLine(value ? "Success!" : "Failed!", value ? ConsoleColor.Green : ConsoleColor.Red);
+            return value;
         }
 
         public static void PopulateMembers(this object instance, Queue<string> arguments)
@@ -80,7 +82,7 @@ namespace HabKit.Utilities
                     object[] values = GetMethodValues(arguments, method);
 
                     var kitArgumentAtt = member.GetCustomAttribute<KitArgumentAttribute>();
-                    int index = (kitArgumentAtt.MethodOrder < 0 ? methods.Count : kitArgumentAtt.MethodOrder);
+                    int index = kitArgumentAtt.MethodOrder < 0 ? methods.Count : kitArgumentAtt.MethodOrder;
 
                     methods.Insert(index, (method, values));
                 }
@@ -105,8 +107,8 @@ namespace HabKit.Utilities
                 object defaultValue = parameter.DefaultValue;
                 if (!parameter.HasDefaultValue)
                 {
-                    defaultValue = (parameter.ParameterType.IsValueType ?
-                        Activator.CreateInstance(parameter.ParameterType) : null);
+                    defaultValue = parameter.ParameterType.IsValueType ?
+                        Activator.CreateInstance(parameter.ParameterType) : null;
                 }
                 if (defaultValue is bool)
                 {
@@ -118,7 +120,7 @@ namespace HabKit.Utilities
         }
         private static object GetMemberValue(Queue<string> arguments, Type memberType, object value = null)
         {
-            memberType = (Nullable.GetUnderlyingType(memberType) ?? memberType);
+            memberType = Nullable.GetUnderlyingType(memberType) ?? memberType;
             if (memberType.IsEnum)
             {
                 if (arguments.Count == 0) return value;

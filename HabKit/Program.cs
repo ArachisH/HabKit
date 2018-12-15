@@ -44,7 +44,7 @@ namespace HabKit
         {
             try
             {
-                KitLogger.SetCursorVisibility(false);
+                KLogger.SetCursorVisibility(false);
                 var arguments = new Queue<string>(args);
 
                 var app = new Program(arguments);
@@ -52,25 +52,25 @@ namespace HabKit
 
                 app.RunAsync(arguments).GetAwaiter().GetResult();
             }
-            finally { KitLogger.SetCursorVisibility(true); }
+            finally { KLogger.SetCursorVisibility(true); }
         }
 
         private Task RunAsync(Queue<string> arguments)
         {
             if (arguments.Count == 0) return Task.CompletedTask;
 
-            KitLogger.WriteLine();
-            "   ██╗  ██╗ █████╗ ██████╗ ██╗  ██╗██╗████████╗".WriteLine(LOGO_COLOR);
-            "   ██║  ██║██╔══██╗██╔══██╗██║ ██╔╝██║╚══██╔══╝".WriteLine(LOGO_COLOR);
-            "   ███████║███████║██████╔╝█████╔╝ ██║   ██║".WriteLine(LOGO_COLOR);
-            "   ██╔══██║██╔══██║██╔══██╗██╔═██╗ ██║   ██║".WriteLine(LOGO_COLOR);
-            "   ██║  ██║██║  ██║██████╔╝██║  ██╗██║   ██║".WriteLine(LOGO_COLOR);
-            "   ╚═╝  ╚═╝╚═╝  ╚═╝╚═════╝ ╚═╝  ╚═╝╚═╝   ╚═╝".WriteLine(LOGO_COLOR);
-            KitLogger.WriteLine();
+            KLogger.EmptyLine();
+            "   ██╗  ██╗ █████╗ ██████╗ ██╗  ██╗██╗████████╗".AppendLine(LOGO_COLOR);
+            "   ██║  ██║██╔══██╗██╔══██╗██║ ██╔╝██║╚══██╔══╝".AppendLine(LOGO_COLOR);
+            "   ███████║███████║██████╔╝█████╔╝ ██║   ██║".AppendLine(LOGO_COLOR);
+            "   ██╔══██║██╔══██║██╔══██╗██╔═██╗ ██║   ██║".AppendLine(LOGO_COLOR);
+            "   ██║  ██║██║  ██║██████╔╝██║  ██╗██║   ██║".AppendLine(LOGO_COLOR);
+            "   ╚═╝  ╚═╝╚═╝  ╚═╝╚═════╝ ╚═╝  ╚═╝╚═╝   ╚═╝".AppendLine(LOGO_COLOR);
+            KLogger.EmptyLine();
 
-            ("Version: ", FileVersionInfo.GetVersionInfo(Assembly.GetExecutingAssembly().Location).FileVersion).WriteLine(null, ConsoleColor.White);
-            ("Output Directory: ", OutputDirectory).WriteLine(null, ConsoleColor.White);
-            KitLogger.WriteLine();
+            ("Version: ", FileVersionInfo.GetVersionInfo(Assembly.GetExecutingAssembly().Location).FileVersion).AppendLine();
+            ("Output Directory: ", OutputDirectory).AppendLine();
+            KLogger.EmptyLine();
 
             string argument = arguments.Peek();
             if (_commandTypes.TryGetValue(argument, out Type commandType))
