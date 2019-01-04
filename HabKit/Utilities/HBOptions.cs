@@ -62,12 +62,6 @@ namespace HabKit.Utilities
         [Command("/rawcam", CommandActions.Modify)]
         public bool IsInjectingRawCamera { get; set; }
 
-        [Command("/desc", CommandActions.Modify)]
-        public bool IsEnablingDescriptions { get; set; }
-
-        [Command("/avtags", CommandActions.Modify)]
-        public bool IsEnablingAvatarTags { get; set; }
-
         [Command("/binrep", CommandActions.Modify, MinParams = 2)]
         public BinRepCommand BinRepInfo { get; set; }
 
