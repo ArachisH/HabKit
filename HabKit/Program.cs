@@ -15,7 +15,7 @@ using Flazzy.IO;
 using Flazzy.ABC;
 using Flazzy.Tags;
 
-using Sulakore.Habbo;
+using Sulakore.Habbo.Web;
 using Sulakore.Habbo.Messages;
 
 using SixLabors.ImageSharp;
@@ -83,7 +83,7 @@ namespace HabKit
                     using (var hasher = new HashWriter(false))
                     {
                         hasher.Write(method);
-                        string hash = hasher.GenerateMD5Hash();
+                        string hash = hasher.GenerateHash();
 
                         List<ASMethod> methods = null;
                         if (!unmatchedMethods.TryGetValue(hash, out methods))
@@ -100,7 +100,7 @@ namespace HabKit
                     using (var hasher = new HashWriter(false))
                     {
                         hasher.Write(method);
-                        string hash = hasher.GenerateMD5Hash();
+                        string hash = hasher.GenerateHash();
 
                         if (unmatchedMethods.ContainsKey(hash))
                         {
@@ -299,7 +299,7 @@ namespace HabKit
             if (Options.RSAInfo != null)
             {
                 Console.Write("Replacing RSA Keys...");
-                Game.ReplaceRSAKeys(Options.RSAInfo.Exponent, Options.RSAInfo.Modulus).WriteLineResult();
+                Game.InjectRSAKeys(Options.RSAInfo.Exponent, Options.RSAInfo.Modulus).WriteLineResult();
             }
 
             if (Options.IsDisablingHostChecks)
@@ -308,22 +308,10 @@ namespace HabKit
                 Game.DisableHostChecks().WriteLineResult();
             }
 
-            if (Options.IsEnablingAvatarTags)
-            {
-                Console.Write("Enabling Avatar Tags...");
-                Game.EnableAvatarTags().WriteLineResult();
-            }
-
-            if (Options.IsEnablingDescriptions)
-            {
-                Console.Write("Enabling Badge Descriptions...");
-                Game.EnableDescriptions().WriteLineResult();
-            }
-
             if (Options.IsAddingBackGameCenter)
             {
                 Console.Write("Enabling GameCenter...");
-                Game.AddBackGameCenterIcon().WriteLineResult();
+                Game.EnableGameCenterIcon().WriteLineResult();
             }
 
             if (Options.IsInjectingRawCamera)
