@@ -1,19 +1,11 @@
 # HabKit
 Command line tool that provides the user with a set of APIs to manipulate the Habbo Hotel client, or simply retrieving information/data from the game.  
 
-## Questions/Suggestions
-Any discussion regarding this project can be done in this [thread](https://forbidden.sh/topic/14-habkit-habbo-hotel-multi-purpose-kit/).  
-If you already have a GitHub account, feel free to create an issue.
-
 ## Requirements
-All future HabKit releases created in this repository will contain two builds that target .NET 4.7, and .NET Core 2.0.  
+All future HabKit releases created in this repository will contain two builds that target .NET 4.7.2, and .NET Core 2.1.  
 This means you only need to install the framework of the build you wish to use.
-* [.NET Framework 4.0](https://www.microsoft.com/en-us/download/details.aspx?id=17851)  
-Habkit v4.3, and below target this framework/version.
-* [.NET Framework 4.7](https://www.microsoft.com/en-us/download/details.aspx?id=55170)  
-HabKit v4.4, and above target this framework/version.
-* [.NET Core 2.0](https://www.microsoft.com/net/download/core#/runtime)  
-HabKit v4.4, and above target this framework/version
+* [.NET Core 2.1](https://www.microsoft.com/net/download/core#/runtime)
+* [.NET Framework 4.7.2](https://dotnet.microsoft.com/download/dotnet-framework-runtime)
 
 ## Commands
 | Command                                                                         | Description                                                                                                                                                    |
@@ -32,8 +24,6 @@ HabKit v4.4, and above target this framework/version
 | /rev [revisionValue]                                                            | Sets the client's revision value found in the Outgoing[4000] message class handler.                                                                            |
 | /rsa ?[[keySize], [modulus exponent]]                                           | Override the client's internal public RSA keys with a newly generated pair, or an already existing one.                                                        |
 | /rawcam                                                                         | Sends a raw blob of binary data to the server that represents the picture the user is trying to preview.                                                       |
-| /desc                                                                           | Re-enables furniture, and badge descriptions in the client.                                                                                                    |
-| /avtags                                                                         | Re-enables user tags/avatar tags in the client                                                                                                                 |
 | /binrep { [id] [replacementPath]] }                                             | Replaces an internal file inside of the swf, based on the given id, and the specified path of the replacement data.                                            |
 | /gamecenter                                                                     | Re-enables the game center icon in the client toolbar.                                                                                                         |
 
@@ -45,33 +35,33 @@ HabKit v4.4, and above target this framework/version
 
 ## Command Examples
 * Fetching Client  
-`HabKit.dll /fetch`  
-`HabKit.dll /fetch REVISION-XXXXXXXXXXXXXXX`  
+`/fetch`  
+`/fetch REVISION-XXXXXXXXXXXXXXX`  
 
 * Change RSA Keys  
-`HabKit.dll Client.swf /dcrypto`  
-`HabKit.dll Client.swf /dcrypto 1024`  
-`HabKit.dll Client.swf /dcrypto 3 86851dd364..........1a9dc783b7`  
+`Client.swf /dcrypto`  
+`Client.swf /dcrypto 1024`  
+`Client.swf /dcrypto 3 86851dd364..........1a9dc783b7`  
 
 * Binary Data Replacement  
-`HabKit.dll Client.swf /binrep 2727 C:\SomeNewFile.xml`  
-`HabKit.dll Client.swf /binrep 2727 C:\SomeNewFile.xml 6382 C:\SomeOtherFile.xml`  
+`Client.swf /binrep 2727 C:\SomeNewFile.xml`  
+`Client.swf /binrep 2727 C:\SomeNewFile.xml 6382 C:\SomeOtherFile.xml`  
 
 * Hardcode EndPoint  
-`HabKit.dll Client.swf /hardep 127.0.0.1:8989`  
-`HabKit.dll Client.swf /hardep yourHost.com:8989`  
+`Client.swf /hardep 127.0.0.1:8989`  
+`Client.swf /hardep yourHost.com:8989`  
 
 * Message ID Updating  
-`HabKit.dll Client.swf /match Previous.swf ClientHeaders.file ServerHeaders.file`  
-`HabKit.dll Client.swf /match Previous.swf ClientHeaders.file ServerHeaders.file -h`  
-`HabKit.dll Client.swf /match Previous.swf ClientHeaders.file ServerHeaders.file -mc`  
-`HabKit.dll Client.swf /match Previous.swf ClientHeaders.file ServerHeaders.file -ii 1`  
+`Client.swf /match Previous.swf ClientHeaders.file ServerHeaders.file`  
+`Client.swf /match Previous.swf ClientHeaders.file ServerHeaders.file -h`  
+`Client.swf /match Previous.swf ClientHeaders.file ServerHeaders.file -mc`  
+`Client.swf /match Previous.swf ClientHeaders.file ServerHeaders.file -ii 1`  
 
 * Client Sanitation  
-  * Register Renaming `HabKit.dll Client.swf /clean -rr`  
-  * Identifier Renaming `HabKit.dll Client.swf /clean -ir`  
-  * Control Flow Deobfuscation `HabKit.dll Client.swf /clean -deob`  
-  * Default/All Sanitation Flags `HabKit.dll Client.swf /clean -rr -ir -deob`  
+  * Register Renaming `Client.swf /clean -rr`  
+  * Identifier Renaming `Client.swf /clean -ir`  
+  * Control Flow Deobfuscation `Client.swf /clean -deob`  
+  * Default/All Sanitation Flags `Client.swf /clean -rr -ir -deob`  
 
 #### Default RSA Keys
 These keys will be used when no parameters are given to the **/dcrypto** command.
