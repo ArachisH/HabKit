@@ -19,6 +19,7 @@ using Sulakore.Habbo.Web;
 using Sulakore.Habbo.Messages;
 
 using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.PixelFormats;
 
 namespace HabKit
 {

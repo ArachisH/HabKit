@@ -1,6 +1,8 @@
 ﻿using System.Drawing;
 using System.Collections.Generic;
+
 using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.PixelFormats;
 
 namespace HabKit.Commands
 {
