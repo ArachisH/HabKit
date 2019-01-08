@@ -370,7 +370,6 @@ namespace HabKit
 
                     Console.WriteLine("Messages Saved: " + msgsPath);
                 }
-
                 string identitiesPath = Path.Combine(Options.OutputDirectory, "Identities.ini");
                 using (var output = new StreamWriter(identitiesPath))
                 {
@@ -425,25 +424,25 @@ namespace HabKit
                         else File.WriteAllBytes(binPath, binTag.Data);
                     }
                 }
+            }
 
-                if (Options.MatchInfo != null)
+            if (Options.MatchInfo != null)
+            {
+                MatchCommand matchInfo = Options.MatchInfo;
+                using (var previousGame = new HGame(matchInfo.PreviousGameInfo.FullName))
                 {
-                    MatchCommand matchInfo = Options.MatchInfo;
-                    using (var previousGame = new HGame(matchInfo.PreviousGameInfo.FullName))
-                    {
-                        Console.Write("Preparing Hash Comparison...");
-                        previousGame.Disassemble();
-                        previousGame.GenerateMessageHashes();
-                        ConsoleEx.WriteLineFinished();
+                    Console.Write("Preparing Hash Comparison...");
+                    previousGame.Disassemble();
+                    previousGame.GenerateMessageHashes();
+                    ConsoleEx.WriteLineFinished();
 
-                        Console.Write("Matching Outgoing Messages...");
-                        ReplaceHeaders(matchInfo.ClientHeadersInfo, previousGame.OutMessages, previousGame.Revision);
-                        ConsoleEx.WriteLineFinished();
+                    Console.Write("Matching Outgoing Messages...");
+                    ReplaceHeaders(matchInfo.ClientHeadersInfo, previousGame.OutMessages, previousGame.Revision);
+                    ConsoleEx.WriteLineFinished();
 
-                        Console.Write("Matching Incoming Messages...");
-                        ReplaceHeaders(matchInfo.ServerHeadersInfo, previousGame.InMessages, previousGame.Revision);
-                        ConsoleEx.WriteLineFinished();
-                    }
+                    Console.Write("Matching Incoming Messages...");
+                    ReplaceHeaders(matchInfo.ServerHeadersInfo, previousGame.InMessages, previousGame.Revision);
+                    ConsoleEx.WriteLineFinished();
                 }
             }
         }
