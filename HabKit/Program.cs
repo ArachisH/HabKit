@@ -68,72 +68,6 @@ namespace HabKit
                     Environment.CurrentDirectory, Options.OutputDirectory);
             }
         }
-        private void Compare(string[] args)
-        {
-            using (var game_1 = new HGame(args[0]))
-            using (var game_2 = new HGame(args[1]))
-            {
-                game_1.Disassemble();
-                game_2.Disassemble();
-
-                var matchedHashes = new List<string>();
-                var oldUnmatched = new Dictionary<string, List<ASMethod>>();
-                var unmatchedMethods = new Dictionary<string, List<ASMethod>>();
-                foreach (ASMethod method in game_1.ABCFiles[0].Methods)
-                {
-                    using (var hasher = new HashWriter(false))
-                    {
-                        hasher.Write(method);
-                        string hash = hasher.GenerateHash();
-
-                        List<ASMethod> methods = null;
-                        if (!unmatchedMethods.TryGetValue(hash, out methods))
-                        {
-                            methods = new List<ASMethod>();
-                            unmatchedMethods.Add(hash, methods);
-                        }
-                        methods.Add(method);
-                    }
-                }
-
-                foreach (ASMethod method in game_2.ABCFiles[0].Methods)
-                {
-                    using (var hasher = new HashWriter(false))
-                    {
-                        hasher.Write(method);
-                        string hash = hasher.GenerateHash();
-
-                        if (unmatchedMethods.ContainsKey(hash))
-                        {
-                            matchedHashes.Add(hash);
-                            unmatchedMethods.Remove(hash);
-                        }
-                        else if (!matchedHashes.Contains(hash))
-                        {
-                            List<ASMethod> methods = null;
-                            if (!oldUnmatched.TryGetValue(hash, out methods))
-                            {
-                                methods = new List<ASMethod>();
-                                oldUnmatched.Add(hash, methods);
-                            }
-                            methods.Add(method);
-                        }
-                    }
-                }
-
-                var changes = string.Empty;
-                foreach (string hash in unmatchedMethods.Keys)
-                {
-                    changes += $"[{hash}]\r\n{{\r\n";
-                    foreach (ASMethod method in unmatchedMethods[hash])
-                    {
-                        changes += $"    {(method.Container?.QName.Name ?? "Anonymous")}\r\n";
-                        changes += $"    {method.ToAS3()}\r\n\r\n";
-                    }
-                    changes += $"}}\r\n";
-                }
-            }
-        }
         public static void Main(string[] args)
         {
             try
@@ -640,6 +574,10 @@ namespace HabKit
                     if (!Options.MatchInfo.MinimalComments)
                     {
                         output.Write(comment);
+                        if (!string.IsNullOrWhiteSpace(match?.Structure))
+                        {
+                            output.Write(" | " + match.Structure);
+                        }
                     }
                     output.WriteLine();
                 }
