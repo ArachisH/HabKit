@@ -4,6 +4,7 @@ using System.Net;
 using System.Linq;
 using System.Drawing;
 using System.Reflection;
+using System.Diagnostics;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
 
@@ -73,7 +74,7 @@ namespace HabKit
             try
             {
                 Console.CursorVisible = false;
-                Console.Title = ("HabKit v" + Assembly.GetExecutingAssembly().GetName().Version);
+                Console.Title = "HabKit v" + FileVersionInfo.GetVersionInfo(Assembly.GetExecutingAssembly().Location).FileVersion;
                 new Program(args).Run();
             }
             finally { Console.CursorVisible = true; }
@@ -124,11 +125,11 @@ namespace HabKit
                         string line = gameDataStream.ReadLine();
                         if (!line.StartsWith("flash.client.url")) continue;
 
-                        int urlStart = (line.IndexOf('=') + 1);
-                        flashClientUrl = ("http:" + line.Substring(urlStart) + "Habbo.swf");
+                        int urlStart = line.IndexOf('=') + 1;
+                        flashClientUrl = "http:" + line.Substring(urlStart) + "Habbo.swf";
 
-                        int revisionStart = (line.IndexOf("gordon/") + 7);
-                        string revision = line.Substring(revisionStart, (line.Length - revisionStart) - 1);
+                        int revisionStart = line.IndexOf("gordon/") + 7;
+                        string revision = line.Substring(revisionStart, line.Length - revisionStart - 1);
 
                         if (Options.FetchRevision == "?")
                         {
@@ -281,7 +282,7 @@ namespace HabKit
                 Game.GenerateMessageHashes();
                 ConsoleEx.WriteLineFinished();
 
-                string hashesPath = (_baseDirectory + "Hashes.ini");
+                string hashesPath = _baseDirectory + "Hashes.ini";
                 In.Load(Game, hashesPath);
                 Out.Load(Game, hashesPath);
             }
@@ -382,7 +383,7 @@ namespace HabKit
         }
         private void Assemble()
         {
-            string asmdPath = Path.Combine(Options.OutputDirectory, ("asmd_" + Options.GameInfo.Name));
+            string asmdPath = Path.Combine(Options.OutputDirectory, "asmd_" + Options.GameInfo.Name);
             using (var asmdStream = File.Open(asmdPath, FileMode.Create))
             using (var asmdOutput = new FlashWriter(asmdStream))
             {
@@ -416,7 +417,7 @@ namespace HabKit
 
             Console.WriteLine($"Outgoing Messages: {Game.OutMessages.Count:n0}");
             Console.WriteLine($"Incoming Messages: {Game.InMessages.Count:n0}");
-            Console.WriteLine("Compilation Date: {0}", (productInfo?.CompilationDate.ToString() ?? "?"));
+            Console.WriteLine("Compilation Date: {0}", productInfo?.CompilationDate.ToString() ?? "?");
             Console.WriteLine("Revision: " + Game.Revision);
         }
 
@@ -495,7 +496,6 @@ namespace HabKit
                 WriteMessage(output, message);
             }
         }
-
         private void ReplaceHeaders(FileInfo file, IDictionary<ushort, MessageItem> previousMessages, string revision)
         {
             int totalMatches = 0, matchAttempts = 0;
@@ -548,25 +548,25 @@ namespace HabKit
                     {
                         matchAttempts--;
                         output.Write("-1");
-                        comment = (" //! Invalid Message ID: " + idMatch.Value);
+                        comment = " //! Invalid Message ID: " + idMatch.Value;
                     }
                     else if (!previousMessages.TryGetValue(id, out MessageItem prevMessage))
                     {
                         matchAttempts--;
                         output.Write("-1");
-                        comment = (" //! Message Not Found: " + id);
+                        comment = " //! Message Not Found: " + id;
                     }
                     else if (!Game.Messages.TryGetValue(prevMessage.Hash, out List<MessageItem> matches))
                     {
                         output.Write("-1");
-                        comment = (" //! No Matches: " + id);
+                        comment = " //! No Matches: " + id;
                     }
                     else match = prevMessage.GetClosestMatch(matches);
 
                     if (match != null)
                     {
                         totalMatches++;
-                        comment = (" // " + id);
+                        comment = " // " + id;
                         output.Write(Options.MatchInfo.IsOutputtingHashes ? match.Hash : match.Id.ToString());
                     }
                     output.Write(suffix);
