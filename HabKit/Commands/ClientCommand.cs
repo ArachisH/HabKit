@@ -139,8 +139,8 @@ namespace HabKit.Commands
 
             ("Images: ", Game.Tags.Count(t => t.Kind == TagKind.DefineBitsLossless2).ToString("n0")).AppendLine();
             ("Binaries: ", Game.Tags.Count(t => t.Kind == TagKind.DefineBinaryData).ToString("n0")).AppendLine();
-            ("Incoming Messages: ", Game.InMessages.Count.ToString("n0")).AppendLine();
-            ("Outgoing Messages: ", Game.OutMessages.Count.ToString("n0")).AppendLine();
+            ("Incoming Messages: ", Game.In.Count().ToString("n0")).AppendLine();
+            ("Outgoing Messages: ", Game.Out.Count().ToString("n0")).AppendLine();
             ("Revision: ", Game.Revision).AppendLine();
 
             KLogger.EmptyLine();
