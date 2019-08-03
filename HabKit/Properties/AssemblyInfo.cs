@@ -9,7 +9,7 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("")]
 [assembly: AssemblyProduct("HabKit")]
-[assembly: AssemblyCopyright("Copyright © ArachisH 2017")]
+[assembly: AssemblyCopyright("Copyright © ArachisH 2019")]
 [assembly: AssemblyTrademark("The Old Nut Man")]
 [assembly: AssemblyCulture("")]
 
@@ -19,7 +19,7 @@ using System.Runtime.InteropServices;
 [assembly: ComVisible(false)]
 
 // The following GUID is for the ID of the typelib if this project is exposed to COM
-[assembly: Guid("f59b48d6-6e68-4b7a-b31c-41e041775e9b")]
+[assembly: Guid("a670d352-bf64-4611-ac81-cf4bd7dfce0d")]
 
 // Version information for an assembly consists of the following four values:
 //
@@ -32,4 +32,4 @@ using System.Runtime.InteropServices;
 // by using the '*' as shown below:
 // [assembly: AssemblyVersion("1.0.*")]
 [assembly: AssemblyVersion("5.0.0.0")]
-[assembly: AssemblyFileVersion("5.0.4.0")]
+[assembly: AssemblyFileVersion("5.0.0.0")]
