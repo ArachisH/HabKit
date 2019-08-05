@@ -24,7 +24,6 @@ namespace HabKit.Commands.Foundation
                     group = new List<(MethodInfo, object[])>();
                     _methods.Add(kitArgumentAtt.Action, group);
                 }
-
                 group.Add(item);
             }
         }
@@ -65,10 +64,10 @@ namespace HabKit.Commands.Foundation
             switch (action)
             {
                 case KitAction.Modify:
-                ("=====[ ", "Modifying", " ]=====").WriteLine(null, ConsoleColor.Cyan, null);
+                ("=====[ ", "Modifying", " ]=====").AppendLine(null, ConsoleColor.Cyan, null);
                 break;
                 case KitAction.Inspect:
-                ("=====[ ", "Inspecting", " ]=====").WriteLine(null, ConsoleColor.Cyan, null);
+                ("=====[ ", "Inspecting", " ]=====").AppendLine(null, ConsoleColor.Cyan, null);
                 break;
             }
         }

@@ -11,7 +11,10 @@ using Flazzy.Tags;
 
 using Sulakore.Habbo;
 using Sulakore.Habbo.Web;
-using Sulakore.Network;
+using System.Security.Cryptography;
+using System.Numerics;
+using HabKit.Properties;
+using System.Text;
 
 namespace HabKit.Commands
 {
@@ -22,9 +25,6 @@ namespace HabKit.Commands
 
         [KitArgument(0)]
         public HGame Game { get; set; }
-
-        //[KitArgument(KitAction.None, "fetch", 'f')]
-        public HHotel FetchHotelTarget { get; set; } = HHotel.Com;
 
         public ClientCommand(Queue<string> arguments)
             : base(arguments)
@@ -53,85 +53,171 @@ namespace HabKit.Commands
         }
 
         #region Command Methods
+#pragma warning disable IDE0051 // Commands are used at runtime
         [KitArgument(KitAction.Modify, "disable-crypto")]
         private bool DisableCrypto()
         {
-            "Disabling Crypto >> ".Write();
+            "Disabling Crypto >> ".Append();
             return Game.DisableHandshake().WriteResult();
         }
 
         [KitArgument(KitAction.Modify, "disable-host-checks")]
         private bool DisableHostChecks()
         {
-            "Disabling Host Checks >> ".Write();
+            "Disabling Host Checks >> ".Append();
             return Game.DisableHostChecks().WriteResult();
         }
 
         [KitArgument(KitAction.Modify, "enable-game-center")]
         private bool EnableGameCenter()
         {
-            "Enabling Game Center >> ".Write();
+            "Enabling Game Center >> ".Append();
             return Game.EnableGameCenterIcon().WriteResult();
+        }
+
+        [KitArgument(KitAction.Modify, "enable-descriptions")]
+        private bool EnableDescriptions()
+        {
+            "Enabling Descriptions >> ".Append();
+
+            int replaceCount = 0;
+            foreach (DefineBinaryDataTag binTag in Game.Tags.Where(t => t.Kind == TagKind.DefineBinaryData))
+            {
+                string nameChunk = Encoding.UTF8.GetString(binTag.Data, 47, 25);
+                if (nameChunk.StartsWith("name=\"badge_details\""))
+                {
+                    replaceCount++;
+                    binTag.Data = Encoding.UTF8.GetBytes(Resources.Badge_Details);
+                }
+                else if (nameChunk.StartsWith("name=\"furni_view\""))
+                {
+                    if (Encoding.UTF8.GetString(binTag.Data, 109, 36) != "7093FB25-BA90-F4A0-8830-2C0B7A06AAF6") continue;
+
+                    replaceCount++;
+                    binTag.Data = Encoding.UTF8.GetBytes(Resources.Furni_View);
+                }
+                if (replaceCount >= 2) break;
+            }
+            return Game.EnableDescriptions().WriteResult();
         }
 
         [KitArgument(KitAction.Modify, "inject-key-shouter")]
         private bool InjectKeyShouter(int messageId = 4001)
         {
-            ("Injecting Key Shouter[", messageId, "] >> ").Write(null, ConsoleColor.Magenta, null);
+            ("Injecting Key Shouter[", messageId, "] >> ").Append(null, ConsoleColor.Magenta, null);
             return Game.InjectKeyShouter(messageId).WriteResult();
+        }
+
+        [KitArgument(KitAction.Modify, "inject-endpoint-shouter")]
+        private bool InjectEndPointShouter(int messageId = 4000)
+        {
+            ("Injecting EndPoint Shouter[", messageId, "] >> ").Append(null, ConsoleColor.Magenta, null);
+            return Game.InjectEndPointShouter(messageId).WriteResult();
+        }
+
+        [KitArgument(KitAction.Modify, "inject-endpoint")]
+        private bool InjectEndPoint(string address)
+        {
+            var addressUri = new Uri("http://" + address);
+
+            ("Injecting EndPoint[", address, "] >> ").Append(null, ConsoleColor.Magenta, null);
+            return Game.InjectEndPoint(addressUri.DnsSafeHost, addressUri.Port).WriteResult();
         }
 
         [KitArgument(KitAction.Modify, "inject-raw-camera")]
         private bool InjectRawCamera()
         {
-            "Injecting Raw Camera >> ".Write();
+            "Injecting Raw Camera >> ".Append();
             return Game.InjectRawCamera().WriteResult();
         }
 
         [KitArgument(KitAction.Modify, "inject-rsa")]
-        private bool InjectRSAKeys(params string[] values)
+        private bool InjectRSAKeys(string[] values)
         {
-            "Injecting RSA Keys >> ".Write();
-            throw new NotSupportedException();
+            string exponent = "3";
+            string modulus = "86851dd364d5c5cece3c883171cc6ddc5760779b992482bd1e20dd296888df91b33b936a7b93f06d29e8870f703a216257dec7c81de0058fea4cc5116f75e6efc4e9113513e45357dc3fd43d4efab5963ef178b78bd61e81a14c603b24c8bcce0a12230b320045498edc29282ff0603bc7b7dae8fc1b05b52b2f301a9dc783b7";
+            string privateExponent = "59ae13e243392e89ded305764bdd9e92e4eafa67bb6dac7e1415e8c645b0950bccd26246fd0d4af37145af5fa026c0ec3a94853013eaae5ff1888360f4f9449ee023762ec195dff3f30ca0b08b8c947e3859877b5d7dced5c8715c58b53740b84e11fbc71349a27c31745fcefeeea57cff291099205e230e0c7c27e8e1c0512b";
+
+            switch (values.Length)
+            {
+                // Use default public key values
+                case 0: break;
+
+                // Use the give value as the RSA key size to generate new public keys
+                case 1:
+                {
+                    int keySize = int.Parse(values[0]);
+                    using (var rsa = new RSACryptoServiceProvider(keySize))
+                    {
+                        RSAParameters rsaKeys = rsa.ExportParameters(true);
+                        modulus = ToHex(rsaKeys.Modulus);
+                        exponent = ToHex(rsaKeys.Exponent);
+                        privateExponent = ToHex(rsaKeys.D);
+                    }
+                    break;
+                }
+
+                // Use the given values as the public keys
+                case 2:
+                {
+                    exponent = values[0];
+                    modulus = values[1];
+                    privateExponent = null;
+                    break;
+                }
+            }
+
+            string keysPath = Path.Combine(Program.OutputDirectory, "RSAKeys.txt");
+            using (var keysOutput = new StreamWriter(keysPath, false))
+            {
+                keysOutput.WriteLine("[E]Exponent: " + exponent);
+                keysOutput.WriteLine("[N]Modulus: " + modulus);
+                keysOutput.Write("[D]Private Exponent: " + privateExponent);
+            }
+
+            "Injecting RSA Keys >> ".Append();
+            return Game.InjectRSAKeys(exponent, modulus).WriteResult();
         }
 
         [KitArgument(KitAction.Modify, "replace-binaries")]
         private void ReplaceBinaries()
         {
-            "Replacing Binaries >> ".Write();
+            "Replacing Binaries >> ".Append();
             throw new NotSupportedException();
         }
 
         [KitArgument(KitAction.Modify, "replace-images")]
         private void ReplaceImages()
         {
-            "Replacing Images >> ".Write();
+            "Replacing Images >> ".Append();
             throw new NotSupportedException();
         }
+#pragma warning restore IDE0051 // Commands are used at runtime
         #endregion
 
         public override async Task<bool> ExecuteAsync()
         {
-            if (Game == null)
+            if (Game != null)
             {
+                Disassemble();
             }
-
-            Disassemble();
 
             bool modifed = await base.ExecuteAsync().ConfigureAwait(false);
             if (modifed)
             {
                 Assemble();
             }
+
             return modifed;
-            //using (var asmdStream = File.Create(Path.Combine(Program.OutputDirectory, "asmd_Habbo.swf")))
-            //{
-            //    Game.CopyTo(asmdStream, Flazzy.CompressionKind.ZLIB);
-            //}
         }
 
         protected void Assemble()
-        { }
+        {
+            //using (var asmdStream = File.Create(Path.Combine(Program.OutputDirectory, "asmd_Habbo.swf")))
+            //{
+            //    Game.CopyTo(asmdStream, Flazzy.CompressionKind.ZLIB);
+            //} 
+        }
         protected void Disassemble()
         {
             ("=====[ ", "Disassembling", " ]=====").AppendLine(null, ConsoleColor.Cyan, null);
@@ -146,6 +232,31 @@ namespace HabKit.Commands
             KLogger.EmptyLine();
         }
 
+        private string ToHex(byte[] data)
+        {
+            return new BigInteger(ReverseNull(data)).ToString("x");
+        }
+        private byte[] ReverseNull(byte[] data)
+        {
+            bool isNegative = false;
+            int newSize = data.Length;
+            if (data[0] > 127)
+            {
+                newSize += 1;
+                isNegative = true;
+            }
+
+            var reversed = new byte[newSize];
+            for (int i = 0; i < data.Length; i++)
+            {
+                reversed[i] = data[data.Length - (i + 1)];
+            }
+            if (isNegative)
+            {
+                reversed[reversed.Length - 1] = 0;
+            }
+            return reversed;
+        }
         private void ReportFetchProgress(double percentage)
         {
             if (_lockedCursorLeftPosition == null)

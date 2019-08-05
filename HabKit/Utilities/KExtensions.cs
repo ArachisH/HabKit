@@ -15,13 +15,13 @@ namespace HabKit.Utilities
     {
         public static bool WriteResult(this bool value)
         {
-            KLogger.WriteLine(value ? "Success!" : "Failed!", value ? ConsoleColor.Green : ConsoleColor.Red);
+            KLogger.AppendLine(value ? "Success!" : "Failed!", value ? ConsoleColor.Green : ConsoleColor.Red);
             return value;
         }
 
         public static void PopulateMembers(this object instance, Queue<string> arguments)
         {
-            PopulateMembers(instance, arguments, out List<(MethodInfo, object[])> methods);
+            PopulateMembers(instance, arguments, out _);
         }
         public static void PopulateMembers(this object instance, Queue<string> arguments, out List<(MethodInfo, object[])> methods)
         {
@@ -47,7 +47,7 @@ namespace HabKit.Utilities
             {
                 if (orphan.PropertyType == typeof(HGame))
                 {
-                    var fileName = (string)DequeOrDefault(arguments);
+                    var fileName = (string)DequeOrDefault(arguments, null, a => a.EndsWith(".swf", StringComparison.OrdinalIgnoreCase));
                     if (!string.IsNullOrWhiteSpace(fileName))
                     {
                         orphan.SetValue(instance, new HGame(Path.GetFullPath(fileName)));
@@ -62,7 +62,7 @@ namespace HabKit.Utilities
 
             var invalidArgs = new List<string>();
             methods = new List<(MethodInfo, object[])>();
-            while (arguments.Count > 0 && !invalidArgs.Contains(arguments.Peek()) && arguments.Peek().StartsWith("-"))
+            while (arguments.Count > 0 && !invalidArgs.Contains(arguments.Peek()))
             {
                 string argument = arguments.Dequeue();
                 if (!members.TryGetValue(argument, out MemberInfo member))
@@ -89,9 +89,9 @@ namespace HabKit.Utilities
             }
         }
 
-        private static object DequeOrDefault(Queue<string> arguments, object value = null)
+        private static object DequeOrDefault(Queue<string> arguments, object value = null, Predicate<string> shouldDeque = null)
         {
-            if (arguments.Count > 0 && !arguments.Peek().StartsWith("-"))
+            if (arguments.Count > 0 && !arguments.Peek().StartsWith("-") && (shouldDeque?.Invoke(arguments.Peek()) ?? true))
             {
                 return arguments.Dequeue();
             }
@@ -144,6 +144,21 @@ namespace HabKit.Utilities
                 case TypeCode.Boolean: return !(bool)value;
                 case TypeCode.String: return DequeOrDefault(arguments, value);
                 case TypeCode.Int32: return Convert.ToInt32(DequeOrDefault(arguments, value));
+
+                case TypeCode.Object:
+                {
+                    // Only support array types
+                    if (!memberType.IsArray) break;
+
+                    var memberValues = new List<string>();
+                    while (arguments.Count > 0 && !arguments.Peek().StartsWith("-"))
+                    {
+                        memberValues.Add(arguments.Dequeue());
+                    }
+
+                    if (memberType == typeof(string[])) return memberValues.ToArray();
+                    break;
+                }
             }
             return value;
         }
