@@ -10,8 +10,41 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Remove="Resources\Badge_Details.xml" />
+    <None Remove="Resources\Furni_View.xml" />
+    <None Remove="Resources\UserView_Test.xml" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Submodules\Sulakore\Submodules\Flazzy\Flazzy\Flazzy.csproj" />
     <ProjectReference Include="..\Submodules\Sulakore\Sulakore\Sulakore.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Resources\Badge_Details.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Resources\Furni_View.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Resources\UserView_Test.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Update="Properties\Resources.Designer.cs">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Resources.resx</DependentUpon>
+    </Compile>
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Update="Properties\Resources.resx">
+      <Generator>ResXFileCodeGenerator</Generator>
+      <LastGenOutput>Resources.Designer.cs</LastGenOutput>
+    </EmbeddedResource>
   </ItemGroup>
 
   <PropertyGroup Condition="'$(TargetFramework)' == 'netcoreapp3.0'">
