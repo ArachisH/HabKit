@@ -1,20 +1,22 @@
 ﻿using System;
 using System.IO;
 using System.Linq;
+using System.Text;
+using System.Numerics;
 using System.Threading.Tasks;
 using System.Collections.Generic;
+using System.Security.Cryptography;
 
 using HabKit.Utilities;
+using HabKit.Properties;
 using HabKit.Commands.Foundation;
 
+using Flazzy;
+using Flazzy.IO;
 using Flazzy.Tags;
 
 using Sulakore.Habbo;
 using Sulakore.Habbo.Web;
-using System.Security.Cryptography;
-using System.Numerics;
-using HabKit.Properties;
-using System.Text;
 
 namespace HabKit.Commands
 {
@@ -26,10 +28,15 @@ namespace HabKit.Commands
         [KitArgument(0)]
         public HGame Game { get; set; }
 
+        [KitArgument(KitAction.Modify, "compression", 'c')]
+        public CompressionKind? Compression { get; set; }
+
         public ClientCommand(Queue<string> arguments)
             : base(arguments)
         { }
 
+        #region Command Methods
+#pragma warning disable IDE0051 // Commands are used at runtime
         [KitArgument(KitAction.None, "fetch", 'f')]
         public async Task FetchAsync(string revision = null)
         {
@@ -52,8 +59,6 @@ namespace HabKit.Commands
             Disassemble();
         }
 
-        #region Command Methods
-#pragma warning disable IDE0051 // Commands are used at runtime
         [KitArgument(KitAction.Modify, "disable-crypto")]
         private bool DisableCrypto()
         {
@@ -201,8 +206,9 @@ namespace HabKit.Commands
             }
 
             bool modifed = await base.ExecuteAsync().ConfigureAwait(false);
-            if (modifed)
+            if (modifed || (Compression != null && Compression != Game.Compression))
             {
+                KLogger.EmptyLine();
                 Assemble();
             }
 
@@ -211,10 +217,14 @@ namespace HabKit.Commands
 
         protected void Assemble()
         {
-            //using (var asmdStream = File.Create(Path.Combine(Program.OutputDirectory, "asmd_Habbo.swf")))
-            //{
-            //    Game.CopyTo(asmdStream, Flazzy.CompressionKind.ZLIB);
-            //} 
+            ("=====[ ", "Assembling", " ]=====").AppendLine(null, ConsoleColor.Cyan, null);
+            string asmdPath = Path.Combine(Program.OutputDirectory, "asmd_" + new FileInfo(Game.Location).Name);
+            using (var asmdStream = File.Open(asmdPath, FileMode.Create))
+            using (var asmdOutput = new FlashWriter(asmdStream))
+            {
+                Game.Assemble(asmdOutput, Compression ?? Game.Compression);
+                Console.WriteLine("File Assembled: " + asmdPath);
+            }
         }
         protected void Disassemble()
         {
