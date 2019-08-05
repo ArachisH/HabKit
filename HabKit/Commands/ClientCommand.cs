@@ -182,14 +182,12 @@ namespace HabKit.Commands
         [KitArgument(KitAction.Modify, "replace-binaries")]
         private void ReplaceBinaries()
         {
-            "Replacing Binaries >> ".Append();
             throw new NotSupportedException();
         }
 
         [KitArgument(KitAction.Modify, "replace-images")]
         private void ReplaceImages()
         {
-            "Replacing Images >> ".Append();
             throw new NotSupportedException();
         }
 #pragma warning restore IDE0051 // Commands are used at runtime
