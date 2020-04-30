@@ -7,7 +7,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "HabKit", "HabKit\HabKit.csp
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Flazzy", "Submodules\Sulakore\Submodules\Flazzy\Flazzy\Flazzy.csproj", "{4448E520-94AB-4416-BE48-D7D6FF565038}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Sulakore", "Submodules\Sulakore\Sulakore\Sulakore.csproj", "{C9D8EEC4-78F4-4F1F-BEE9-89D0F8497D6C}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Sulakore", "Submodules\Sulakore\Sulakore\Sulakore.csproj", "{F50E282B-6D89-4B86-8A6F-E6019553DDEC}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -23,10 +23,10 @@ Global
 		{4448E520-94AB-4416-BE48-D7D6FF565038}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4448E520-94AB-4416-BE48-D7D6FF565038}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{4448E520-94AB-4416-BE48-D7D6FF565038}.Release|Any CPU.Build.0 = Release|Any CPU
-		{C9D8EEC4-78F4-4F1F-BEE9-89D0F8497D6C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{C9D8EEC4-78F4-4F1F-BEE9-89D0F8497D6C}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{C9D8EEC4-78F4-4F1F-BEE9-89D0F8497D6C}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{C9D8EEC4-78F4-4F1F-BEE9-89D0F8497D6C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F50E282B-6D89-4B86-8A6F-E6019553DDEC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F50E282B-6D89-4B86-8A6F-E6019553DDEC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F50E282B-6D89-4B86-8A6F-E6019553DDEC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F50E282B-6D89-4B86-8A6F-E6019553DDEC}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
