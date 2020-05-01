@@ -32,7 +32,7 @@ namespace HabKit.Utilities
         {
             Append(value, Console.ForegroundColor);
         }
-        public static void Append(this object value, ConsoleColor color)
+        public static void Append(this object? value, ConsoleColor color)
         {
             ConsoleColor currentColor = Console.ForegroundColor;
             Console.ForegroundColor = color;
@@ -40,9 +40,9 @@ namespace HabKit.Utilities
             Console.Write(value);
             Console.ForegroundColor = currentColor;
         }
-        public static void Append(this ITuple values, params ConsoleColor?[] colors)
+        public static void Append(this ITuple values, params ConsoleColor?[]? colors)
         {
-            if (colors.Length == 0) colors = null;
+            if (colors?.Length == 0) colors = null;
             for (int i = 0; i < values.Length; i++)
             {
                 Append(values[i], colors?[i] ?? Console.ForegroundColor);

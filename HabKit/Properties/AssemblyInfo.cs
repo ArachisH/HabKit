@@ -9,7 +9,7 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("")]
 [assembly: AssemblyProduct("HabKit")]
-[assembly: AssemblyCopyright("Copyright © ArachisH 2019")]
+[assembly: AssemblyCopyright("Copyright © ArachisH 2020")]
 [assembly: AssemblyTrademark("The Old Nut Man")]
 [assembly: AssemblyCulture("")]
 

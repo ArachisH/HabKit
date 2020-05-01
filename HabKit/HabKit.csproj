@@ -4,16 +4,15 @@
     <OutputType>Exe</OutputType>
     <PlatformTarget>AnyCPU</PlatformTarget>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
-    <TargetFrameworks>net472;netcoreapp3.0</TargetFrameworks>
+    <TargetFrameworks>netcoreapp3.1</TargetFrameworks>
+    
     <DebugType Condition="'$(Configuration)'=='Release'">none</DebugType>
     <DebugSymbols Condition="'$(Configuration)'=='Release'">false</DebugSymbols>
   </PropertyGroup>
 
-  <ItemGroup>
-    <None Remove="Resources\Badge_Details.xml" />
-    <None Remove="Resources\Furni_View.xml" />
-    <None Remove="Resources\UserView_Test.xml" />
-  </ItemGroup>
+  <PropertyGroup>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Submodules\Sulakore\Submodules\Flazzy\Flazzy\Flazzy.csproj" />
@@ -21,39 +20,22 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="Resources\Badge_Details.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Resources\Furni_View.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Resources\UserView_Test.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
+    <Content Remove="Resources\Badge_Details.xml" />
+    <Content Remove="Resources\Furni_View.xml" />
+    <Content Remove="Resources\UserView_Test.xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\Badge_Details.xml" />
+    <EmbeddedResource Include="Resources\Furni_View.xml" />
+    <EmbeddedResource Include="Resources\UserView_Test.xml" />
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Update="Properties\Resources.Designer.cs">
-      <DesignTime>True</DesignTime>
-      <AutoGen>True</AutoGen>
-      <DependentUpon>Resources.resx</DependentUpon>
-    </Compile>
+    <PackageReference Include="System.CommandLine" Version="2.0.0-beta*" />
   </ItemGroup>
 
-  <ItemGroup>
-    <EmbeddedResource Update="Properties\Resources.resx">
-      <Generator>ResXFileCodeGenerator</Generator>
-      <LastGenOutput>Resources.Designer.cs</LastGenOutput>
-    </EmbeddedResource>
-  </ItemGroup>
-
-  <PropertyGroup Condition="'$(TargetFramework)' == 'netcoreapp3.0'">
+  <PropertyGroup Condition="'$(TargetFramework)' == 'netcoreapp3.1'">
     <DefineConstants Condition="'$(Configuration)'=='Release'" />
-  </PropertyGroup>
-
-  <PropertyGroup Condition="'$(TargetFramework)' == 'net472'">
-    <DefineConstants>ISNETFRAMEWORK</DefineConstants>
-    <DefineConstants Condition="'$(Configuration)'=='Debug'">TRACE;DEBUG;ISNETFRAMEWORK</DefineConstants>
   </PropertyGroup>
 
 </Project>
